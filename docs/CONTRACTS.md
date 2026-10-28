@@ -1,6 +1,6 @@
 # CONTRACTS — контракти між модулями
 
-Статус: **ЧЕРНЕТКА v0.3** (оновлено 2026-10-28 за рішенням власника на запити Шахового ядра; v0.2 склав Архітектор). Структуру модулів погоджено власником. Сигнатури остаточні після підтвердження Android і UI. Шахове ядро підтвердило розділи 2 і 3 з правками v0.3. Версія злита 2026-10-28: до правок Шахового ядра додано розділи 7.1 і 7.2 від Архітектора; Архітектор має підтвердити результат.
+Статус: **ЧЕРНЕТКА v0.4** (Архітектор, 2026-10-28). Злиту версію v0.3 (правки Шахового ядра + розділи 7.1 і 7.2 Архітектора) Архітектор переглянув і підтвердив з уточненнями v0.4. Структуру модулів погоджено власником. Шахове ядро підтвердило розділи 2 і 3. Сигнатури остаточні після підтвердження Android і UI (розділи 3.4, 3.5, 5) і Навчання і контент (розділ 4).
 Підпорядковується `MASTER_SPEC.md`. Якщо є суперечність, діє специфікація.
 
 Код нижче це **специфікація інтерфейсів** (сигнатури й семантика), а не готова реалізація.
@@ -9,6 +9,13 @@
 - Несумісно: `EngineService.analyse()` повертає `Flow<AnalysisEvent>` (було `Flow<AnalysisUpdate>`); `EngineService.start()` приймає `EngineConfig`.
 - Додано: `Position.positionKey`; `EngineConfig`; `AnalysisEvent`; `EngineCapabilities.hashMaxMb`; `ChessError.NoLegalMoves`; `ChessRules.isCheckmate/isStalemate/isInsufficientMaterial`.
 - Уточнено: `Evaluation.Mate` ніколи не дорівнює 0; `apply` повертає `Err(IllegalMove)`, а `toSan` кидає виняток; правила статусів нічиєї (3.2); `PgnCodec` отримує `ChessRules` через конструктор (3.3); режим розгортання рушія й поведінка на позиції без ходів (3.4); порядок кандидатів у Handicap (3.5).
+
+**Зміни v0.3 → v0.4** (рішення Архітектора й власника 2026-10-28):
+- Підтверджено: `ChessError.NoLegalMoves` і визначення `InsufficientMaterial` (3.2).
+- Додано: декоратор `HandicapEngineService` у `:core-chess:api` (3.5); специфікація `FakeEngineService` під `AnalysisEvent` і `EngineConfig` (7.3).
+- Уточнено: `positionKey` враховує поле взяття на проході лише коли взяття **легально** можливе (2); `NoLegalMoves` не змінює `EngineState` (3.4); у чому саме полягає скасування для `bestMove` і `analyse` (3.4); діапазони UCI_Elo і Skill Level для `sf_19` (3.5, вимога 1).
+- Виправлено: коментар до `SearchLimit` посилався на неіснуюче `AnalysisRequest.infinite` (3.4).
+- Рішення власника: набір ABI для MVP лише `arm64-v8a` (7.2).
 
 **Позначки:**
 - **[MVP]**: реалізується на етапі 2, сигнатура фіксується зараз.
@@ -72,7 +79,7 @@ data class CastlingRights(
 
 interface Position {                                   // незмінна позиція; рівність двох позицій = рівність positionKey (реалізація перевизначає equals/hashCode)
     val fen: Fen                                       // повний FEN з лічильниками; поле взяття на проході за специфікацією FEN (після кожного подвійного ходу пішака)
-    val positionKey: String                            // FEN без лічильників; поле взяття на проході лише коли таке взяття можливе. Ключ повторень позиції
+    val positionKey: String                            // FEN без лічильників; поле взяття на проході лише коли таке взяття легально можливе (з урахуванням зв'язки й шаху). Ключ повторень позиції
     val sideToMove: Color
     val castling: CastlingRights
     val enPassant: Square?                             // поле взяття на проході, якщо є
@@ -98,7 +105,7 @@ sealed interface ChessError {
     data class PgnIllegalMove(val gameIndex: Int, val ply: Int, val san: String) : ChessError
     data class EngineUnavailable(val reason: String) : ChessError
     data class EngineCrashed(val reason: String) : ChessError
-    data object NoLegalMoves : ChessError              // рушія запитали про позицію без легальних ходів (мат або пат)
+    data object NoLegalMoves : ChessError              // рушія запитали про позицію без легальних ходів (мат або пат). Очікувана помилка, не збій рушія
     data object Cancelled : ChessError
 }
 ```
@@ -167,9 +174,9 @@ enum class AutoDrawReason { FIVEFOLD_REPETITION, SEVENTY_FIVE_MOVE_RULE }
 
 Правила статусу (v0.3):
 - Пріоритет: мат, пат, недостатній матеріал, автоматична нічия (75 ходів, 5 повторень), `DrawClaimable`, `Ongoing`. Мат, поставлений на 100-му чи 150-му півході, лишається `Checkmate`.
-- Повторення рахуються за `Position.positionKey` (розстановка, черга ходу, права рокіровки, поле взяття на проході лише коли воно можливе). Три повторення дають `THREEFOLD_REPETITION` у `DrawClaimable`, п'ять це `FIVEFOLD_REPETITION` автоматично. `halfmoveClock >= 100` дає `FIFTY_MOVE_RULE` у `DrawClaimable`, `>= 150` це `SEVENTY_FIVE_MOVE_RULE` автоматично.
+- Повторення рахуються за `Position.positionKey` (розстановка, черга ходу, права рокіровки, поле взяття на проході лише коли взяття легально можливе). Три повторення дають `THREEFOLD_REPETITION` у `DrawClaimable`, п'ять це `FIVEFOLD_REPETITION` автоматично. `halfmoveClock >= 100` дає `FIFTY_MOVE_RULE` у `DrawClaimable`, `>= 150` це `SEVENTY_FIVE_MOVE_RULE` автоматично.
 - Вимога нічиєї «за намірюваним ходом» (повторення виникне після ходу) у MVP не підтримується: `DrawClaimable` лише для повторень, що вже виникли.
-- `InsufficientMaterial` лише коли мат неможливий за жодної послідовності легальних ходів: K проти K; K+слон проти K; K+кінь проти K; позиції лише з королями й слонами, де всі слони стоять на полях одного кольору. Не є автоматичною нічиєю: K+2 коні проти K, K+кінь проти K+кінь, K+слон проти K+кінь, слони різних кольорів. Заблоковані позиції з пішаками не розпізнаються. Визначення на підтвердження Архітектора.
+- `InsufficientMaterial` лише коли мат неможливий за жодної послідовності легальних ходів: K проти K; K+слон проти K; K+кінь проти K; позиції лише з королями й слонами, де всі слони стоять на полях одного кольору. Не є автоматичною нічиєю: K+2 коні проти K, K+кінь проти K+кінь, K+слон проти K+кінь, слони різних кольорів. Заблоковані позиції з пішаками не розпізнаються. **Підтверджено Архітектором 2026-10-28:** визначення відповідає принципу «мат неможливий за жодної послідовності легальних ходів» і не оголошує нічию там, де мат теоретично можливий. Ширше розпізнавання «мертвих» позицій у MVP не потрібне; гравець може вимагати нічию іншими шляхами.
 
 ### 3.3 PGN [MVP]
 
@@ -225,7 +232,7 @@ data class EngineCapabilities(
 )
 
 data class SearchLimit(val depth: Int? = null, val moveTimeMs: Long? = null, val nodes: Long? = null)
-// Хоча б одне поле не null, інакше IllegalArgumentException. Нескінченний аналіз: окремо, через analyse() без ліміту → AnalysisRequest.infinite
+// Хоча б одне поле не null, інакше IllegalArgumentException. Нескінченний аналіз задається не тут, а через AnalysisRequest.limit == null
 
 data class MoveRequest(val startFen: Fen, val moves: List<Uci>, val level: DifficultyLevel)
 data class AnalysisRequest(val startFen: Fen, val moves: List<Uci>, val limit: SearchLimit?, val multiPv: Int = 1)
@@ -255,7 +262,8 @@ data class AnalysisUpdate(
 - Падіння нативної частини → `EngineState.Failed(EngineCrashed)`. Повторний `start()` дозволено. Цільова вимога: застосунок не падає разом із рушієм. У режимі in-process збій рівня процесу (SIGSEGV) цього не гарантує, див. «Режим розгортання».
 - Діапазони сили беруться лише з `capabilities`. **Інші модулі не хардкодять числа Elo чи Skill Level.**
 - Режим розгортання: in-process JNI чи окремий процес Android Service це деталь реалізації за `EngineService`; контракт однаковий. Прототип етапу 1 порівнює обидва режими, вибір після прототипу (запис у журналі). Критерії порівняння: поведінка при падінні нативного коду, затримка першого ходу й аналізу, споживання пам'яті, складність коду, поведінка при виході у фон. Контрактні тести `EngineService` однакові для обох реалізацій.
-- Позиція без легальних ходів: `bestMove` повертає `Err(NoLegalMoves)`, `analyse` видає `Failed(NoLegalMoves)`.
+- Позиція без легальних ходів: `bestMove` повертає `Err(NoLegalMoves)`, `analyse` видає `Failed(NoLegalMoves)`. `EngineState` при цьому не змінюється (лишається `Ready`): це очікувана помилка запиту, не збій рушія. Реалізація може перевірити це через `ChessRules` без звернення до Stockfish.
+- Скасування поточного пошуку новим запитом: попередній `bestMove` повертає `Err(Cancelled)`, попередній `analyse` видає `Failed(Cancelled)` і завершується. Скасування збору `Flow` самим споживачем подій не створює (див. нижче).
 - Оцінки в `AnalysisUpdate.evaluation` завжди з погляду білих. Реалізація `EngineService` отримує `ChessRules` через конструктор (щоб визначити, чия черга ходу в корені пошуку).
 - `analyse`: кожен рядок MultiPV це окрема подія `Update` (поле `multiPv` = 1..N), глибина зростає. Після `Finished` чи `Failed` Flow завершується; скасування збору споживачем подій не створює.
 
@@ -290,13 +298,34 @@ interface DifficultyPresets {
 Назви рівнів для UI: ключі `difficulty_<id>` у `strings.xml` (створює Android і UI, список id надає Шахове ядро).
 
 **Вимоги до `Strength.Handicap` (завдання Шахового ядра):**
-1. Мінімальне значення UCI_Elo у Stockfish відчутно сильніше за справжнього новачка. Точне значення **не хардкодити**: читати з `capabilities.eloRange` (за пам'яттю в сучасних версіях близько 1320, **перевірити** для обраної версії через вивід опцій UCI).
+1. Мінімальне значення UCI_Elo у Stockfish відчутно сильніше за справжнього новачка. Точне значення **не хардкодити**: читати з `capabilities.eloRange`. Для `sf_19` Шахове ядро встановило за вихідним кодом: UCI_Elo 1320–3190, Skill Level 0–20 (див. `THIRD_PARTY.md`, SW-001). Ці числа довідкові: інша версія рушія може мати інші межі.
 2. Не менше **3 рівнів** нижче найслабшого рівня UCI_Elo. Точну кількість і калібрування пропонує Шахове ядро.
 3. Ослаблення реалізується в `core-chess` поверх рушія (наприклад, вибір серед кількох кандидатів MultiPV з ймовірністю гіршого ходу, обмеження глибини/вузлів, ймовірність не помітити взяття чи мат). Конкретний алгоритм обирає Шахове ядро й документує в `docs/`.
 4. Усі ходи **легальні**. Гра має виглядати як помилки людини-початківця, а не як випадкові ходи: найслабший рівень іноді пропускає незахищену фігуру й мат в 1, але не віддає фігури безглуздо на кожному ході.
 5. Детермінованість для тестів: джерело випадковості `Random` передається в конструктор реалізації. З однаковим seed і однаковою позицією вибір однаковий. Шар Handicap сам стабільно сортує кандидатів (за оцінкою, за рівності за рядком UCI) перед вибором і витрачає однакову кількість викликів `Random` на хід; порядок `ChessRules.legalMoves` не гарантується.
 6. Рушій на рівнях Handicap не заявляє рейтинг Elo (`approxElo = null`), поки немає калібрування.
 7. Тести: легальність усіх ходів; статистика на наборі позицій (частка найкращих ходів монотонно зростає від step 1 до найслабшого рівня Elo); найслабший рівень не програє матеріал щоходу у стартових позиціях.
+
+**Розміщення шару Handicap (рішення Архітектора 2026-10-28, пропозиція Шахового ядра):** декоратор над `EngineService` у `:core-chess:api`.
+
+```kotlin
+class HandicapEngineService(               // :core-chess:api; пакет у межах org.chesstrainer.core на розсуд Шахового ядра
+    delegate: EngineService,               // «сира» реалізація з :core-chess:engine-android або FakeEngineService
+    rules: ChessRules,
+    random: Random
+) : EngineService
+```
+
+Правила:
+- `bestMove` з `Strength.Handicap`: декоратор сам обирає хід за алгоритмом Шахового ядра (кандидати через `delegate.analyse` з MultiPV і/або `ChessRules`), повертає `EngineMove(best, ponder = null)`.
+- `bestMove` з будь-якою іншою `Strength`, а також `analyse`, `start`, `stop`, `newGame`, `state`, `capabilities`: передаються в `delegate` без змін. **Аналіз завжди на повну силу**, Handicap його не стосується.
+- «Сирі» реалізації `EngineService` (`engine-android`, `FakeEngineService`) запит із `Strength.Handicap` не обробляють: це порушення контракту викликачем, `IllegalArgumentException`. Тест відразу виявить, що декоратор забули підключити.
+- `app` у точці збирання залежностей (composition root) **завжди** загортає «сирий» рушій у `HandicapEngineService`. Решта `app` бачить лише загорнутий екземпляр як `EngineService`.
+- Декоратор дотримується всіх правил 3.4: один пошук одночасно, `Cancelled` при заміні запиту, `NoLegalMoves`, `EngineCrashed` від `delegate` передаються як є.
+- `DifficultyPresets.levels()` не повертає рівні Handicap, якщо `capabilities.maxMultiPv` менше, ніж потрібно алгоритму.
+- Контрактні тести `EngineService` (`tests/contract/`) запускаються і для `HandicapEngineService` поверх `FakeEngineService`.
+
+Чому так: шар лишається чистим Kotlin і тестується на JVM без пристрою; не залежить від того, де працює Stockfish (in-process чи окремий процес); `app` і `learning` про нього не знають; `engine-android` лишається тонкою обгорткою. Ризик: у режимі окремого процесу кожен хід Handicap коштує додаткового звернення через IPC. На слабких рівнях ліміти пошуку малі, а `minReplyDelayMs` однаково додає паузу, тому вплив очікується незначним. Прототип має це виміряти.
 
 ### 3.6 Аналіз позиції [MVP]
 
@@ -514,7 +543,7 @@ object NoMonetization : Monetization { override val isEnabled = false }
 
 - Тексти: `content/uk/lessons/…`, `content/en/lessons/…`. Обидві мови обов'язкові (перевірка CI).
 - Позиції й вправи уроку мовно-незалежні; тексти посилаються на них через ключі.
-- Ліцензія власних текстів: GPL-3.0. Кожен файл має заголовок з ліцензією.
+- Ліцензія власних текстів: GPL-3.0-or-later. Кожен файл має SPDX-заголовок (MASTER_SPEC 10).
 
 ### 6.3 Дебюти [Пізніше]
 
@@ -525,7 +554,7 @@ object NoMonetization : Monetization { override val isEnabled = false }
 - `ChessRules`: perft на еталонних позиціях. Стартова позиція, глибина 5 = 4 865 609 вузлів. «Kiwipete», глибина 3 = 97 862. Додаткові позиції ядро добирає з таблиці chessprogramming.org/Perft_Results (на неї посилається `tests/perft.sh` у Stockfish) і документує. Окремі тести на рокіровку, взяття на проході, перетворення, пат, повторення, 50 і 75 ходів, недостатній матеріал.
 - Perft виконується в CI (GitHub Actions) за правилами розділу 7.1; червоний CI блокує злиття в `main`.
 - Окремі тести на нові методи й правила v0.3: `positionKey` (взяття на проході враховується лише коли воно можливе), `isCheckmate`, `isStalemate`, `isInsufficientMaterial` (зокрема K+кінь проти K+кінь не є нічиєю), пріоритет статусів (мат на 100-му півході), `apply` з нелегальним ходом повертає `Err(IllegalMove)`, `toSan` з нелегальним ходом кидає `IllegalArgumentException`.
-- `EngineService`: `FakeEngineService` у `:core-chess:api` (testFixtures) для тестів `learning` і `app`.
+- `EngineService`: `FakeEngineService` у `:core-chess:api` (testFixtures) для тестів `learning` і `app`, специфікація в 7.3.
 - `Strength.Handicap`: див. розділ 3.5, п. 7.
 - `PgnCodec`: круговий тест (parse → write → parse) і «золоті» файли.
 - `learning`: тести на JVM з фейковими портами й фіксованими `Clock`/`Random`.
@@ -543,24 +572,62 @@ object NoMonetization : Monetization { override val isEnabled = false }
 
 ### 7.2 Набір ABI і тестування без емулятора x86 [MVP]
 
-**Пропозиція, чекає рішення власника (MASTER_SPEC 13.2).**
+**Рішення власника 2026-10-28: набір ABI для MVP лише `arm64-v8a`** (і в релізній, і у відладковій збірці).
 
-- Реліз: лише `arm64-v8a`. `armeabi-v7a` додається, лише якщо Play Console покаже помітну частку 32-бітних пристроїв (Google Play вимагає 64-бітну версію поряд із 32-бітною). Відладкова збірка: `arm64-v8a` + `x86_64` (для емуляторів і CI; у реліз не потрапляє).
+- `x86_64` у MVP не збирається. Тестування без x86-емулятора йде рівнями нижче.
+- `armeabi-v7a` чи `x86_64` можна додати після MVP лише окремим рішенням власника (наприклад, якщо Play Console покаже помітну частку 32-бітних пристроїв; Google Play вимагає 64-бітну версію поряд із 32-бітною).
 - Рівні тестування рушія:
   1. Логіка навколо рушія (Handicap, рівні, аналіз, протокол UCI): JVM-тести з `FakeEngineService`.
   2. Протокол UCI зі справжнім Stockfish: на JVM з нативною збіркою для хост-машини (Linux x86_64 у CI) через той самий шар обгортки, якщо Шахове ядро підтвердить, що обгортку можна зібрати для хоста.
   3. Справжня поведінка на Android: фізичний пристрій `arm64-v8a` через USB-налагодження (основний спосіб) або емулятор `arm64-v8a` на хості з ARM-процесором.
   4. Нативний arm64 у GitHub Actions (раннер `ubuntu-24.04-arm`) для збірки й бенчмарка arm64-версії Stockfish під звичайний Linux; перевіряє ARM-код, але не JNI й не особливості Android. Умови безкоштовного використання перевірити.
-  5. Дві нативні бібліотеки (`armv8` і `armv8-dotprod`) з вибором за можливостями процесора; налагоджувальний перемикач примусово вмикає базову. Бажано мати телефон без dotprod для ручної перевірки.
+  5. Дві нативні бібліотеки (`armv8` і `armv8-dotprod`) з вибором за можливостями процесора; налагоджувальний перемикач примусово вмикає базову. Бажано мати телефон без dotprod для ручної перевірки. Обидві бібліотеки належать до ABI `arm64-v8a`, тому рішенню власника не суперечать.
+
+### 7.3 `FakeEngineService` (testFixtures `:core-chess:api`) [MVP]
+
+Пише Шахове ядро. Споживачі: `learning`, `app`, контрактні тести. Підключення: `testFixtures(project(":core-chess:api"))` (сумісність testFixtures чистого JVM-модуля з Android-модулем `:app` перевіряє Android і UI під час створення каркаса).
+
+```kotlin
+class FakeEngineService(
+    rules: ChessRules,
+    capabilities: EngineCapabilities = DEFAULT_CAPABILITIES
+) : EngineService {
+    // сценарії (необов'язкові; без них діє поведінка за замовчуванням)
+    fun onBestMove(responder: (MoveRequest) -> ChessResult<EngineMove>)
+    fun onAnalyse(responder: (AnalysisRequest) -> List<AnalysisEvent>)   // список має закінчуватися Finished або Failed
+    fun holdSearches()                    // нові пошуки чекають release(), щоб тест міг перевірити скасування
+    fun release()
+    fun crash(reason: String = "fake crash")
+    // записи для перевірок у тестах
+    val appliedConfigs: List<EngineConfig>   // конфігурація після обрізання за capabilities
+    val moveRequests: List<MoveRequest>
+    val analysisRequests: List<AnalysisRequest>
+
+    companion object { val DEFAULT_CAPABILITIES: EngineCapabilities }
+}
+```
+
+Поведінка за замовчуванням:
+- `start(config)`: `Stopped → Starting → Ready`; `config` обрізається за `capabilities` і записується в `appliedConfigs`. Повторний `start` у `Ready`/`Busy` повертає `Ok` і нічого не змінює. `capabilities` дорівнює `null` до першого успішного `start`.
+- Виклики до `start` або після `stop`: `bestMove` → `Err(EngineUnavailable)`, `analyse` → `Failed(EngineUnavailable)`.
+- `bestMove`: перший легальний хід після сортування за рядком UCI (детерміновано). Позиція без ходів → `Err(NoLegalMoves)`, стан лишається `Ready`.
+- `analyse`: для кожного `multiPv` від 1 до min(запитаний, кількість легальних ходів) одна подія `Update` (глибина 1, `Centipawns(0)`, `pv` з одного ходу в порядку сортування за UCI), потім `Finished`. Позиція без ходів → `Failed(NoLegalMoves)`.
+- Заміна запиту новим (під час `holdSearches`): попередній `bestMove` → `Err(Cancelled)`, попередній `analyse` → `Failed(Cancelled)`.
+- `crash()`: `state` → `Failed(EngineCrashed)`; активний пошук завершується `Err(EngineCrashed)` / `Failed(EngineCrashed)`; далі як до `start`; повторний `start` дозволено.
+- Запит із `Strength.Handicap` → `IllegalArgumentException` (як у «сирій» реалізації, 3.5).
+- Без реального часу: жодних `Thread.sleep` і годинника; час і диспетчер передаються ззовні.
+- `DEFAULT_CAPABILITIES`: `name = "FakeEngine"`, `version = "0"`, `eloRange = 1320..3190`, `skillLevelRange = 0..20` (як у `sf_19` за записом Шахового ядра), `maxMultiPv = 5`, `threadsMax = 4`, `hashMaxMb = 256`. Останні три це **тестові значення**, не факти про Stockfish.
+- `FakeEngineService` сам проходить контрактні тести `EngineService` з `tests/contract/`.
 
 ## 8. Відкриті питання контрактів
 
 1. Остаточний вибір бібліотеки правил: умовно chesslib (Apache-2.0) із власними правилами нічиєї; остаточно після успішного perft у CI.
 2. Калібрування `Handicap`: п'ять кроків запропоновано, параметри уточнюються після прототипу рушія (Шахове ядро).
 3. Режим розгортання рушія: in-process чи окремий процес Service (прототип етапу 1).
-4. Розміщення шару Handicap: декоратор над `EngineService` у `:core-chess:api` (пропозиція Шахового ядра, рішення Архітектора).
-5. `ChessError.NoLegalMoves` і визначення `InsufficientMaterial` у 3.2 (підтвердити Архітектору).
-6. Формат зберігання бази задач і обсяг вибірки (6.1).
-6a. Чи можна зібрати JNI-обгортку Stockfish для хоста Linux x86_64 (рівень 2 у 7.2): відповідь Шахового ядра після прототипу.
-7. Пропозиція нічиєї в грі проти рушія (5).
+4. Формат зберігання бази задач і обсяг вибірки (6.1).
+5. Чи можна зібрати JNI-обгортку Stockfish для хоста Linux x86_64 (рівень 2 у 7.2): відповідь Шахового ядра після прототипу.
+6. Пропозиція нічиєї в грі проти рушія (5).
+7. Підтвердження Шаховим ядром уточнення v0.4 щодо `positionKey` (взяття на проході лише коли воно легально можливе).
 8. [Пізніше] Алгоритм інтервального повторення, пороги класифікації помилок, схема уроків.
+
+Закрито у v0.4: розміщення шару Handicap (3.5), `NoLegalMoves` і `InsufficientMaterial` (3.2), набір ABI (7.2).
