@@ -1,6 +1,6 @@
 # CONTRACTS — контракти між модулями
 
-Статус: **ЧЕРНЕТКА v0.5** (Архітектор, 2026-10-29). Структуру модулів погоджено власником і реалізовано в каркасі Gradle (PR #1). Підтверджено: розділи 2 і 3 (Шахове ядро), розділ 5 (Android і UI, закрито рішенням власника 2026-10-29). Чекають підтвердження: `EngineConfig` і `AnalysisEvent` у 3.4 з боку Android і UI; розділ 4 (Навчання і контент).
+Статус: **ЧЕРНЕТКА v0.6** (Архітектор, 2026-10-29). Структуру модулів погоджено власником і реалізовано в каркасі Gradle (PR #1). Підтверджено: розділи 2 і 3 (Шахове ядро), розділ 5 (Android і UI, закрито рішенням власника 2026-10-29). Чекають підтвердження: `EngineConfig` і `AnalysisEvent` у 3.4 з боку Android і UI; розділ 4 (Навчання і контент).
 Підпорядковується `MASTER_SPEC.md`. Якщо є суперечність, діє специфікація.
 
 Код нижче це **специфікація інтерфейсів** (сигнатури й семантика), а не готова реалізація.
@@ -21,6 +21,10 @@
 - Додано: розділ 1.1 «Конфігурація збірки» (`minSdk 26`, `targetSdk 36`, `compileSdk 37`, JVM 17, JDK 21 у CI, тимчасовий `applicationId`).
 - Підтверджено: розділ 5 (Android і UI).
 - Уточнено: підключення testFixtures (7.3) перевіряється після появи плагіна `java-test-fixtures` у `:core-chess:api`; JDK і версії дій у CI (7.1).
+
+**Зміни v0.5 → v0.6** (Архітектор, 2026-10-29, за реалізацією `FakeEngineService` Шаховим ядром; сигнатури не змінювались):
+- Уточнено семантику `EngineService` (3.4) для всіх реалізацій: `start()` у стані `Starting`; `stop()` під час пошуку; «останній запит перемагає» також для запитів, що завершуються помилкою (`NoLegalMoves`, некоректна позиція); помилки некоректної позиції в запиті.
+- 7.3: поведінка `FakeEngineService` узгоджена з 3.4; `StubRules` лишається в `src/test` (не частина API фікстур).
 
 **Позначки:**
 - **[MVP]**: реалізується на етапі 2, сигнатура фіксується зараз.
@@ -228,7 +232,7 @@ MVP: лише головна лінія. Варіанти `( … )` пропус
 interface EngineService {
     val state: StateFlow<EngineState>
     val capabilities: EngineCapabilities?             // null до першого успішного start()
-    suspend fun start(config: EngineConfig = EngineConfig()): ChessResult<Unit>   // Ready/Busy: повторний start ігнорується (Ok). Змінити налаштування: stop() і start(config)
+    suspend fun start(config: EngineConfig = EngineConfig()): ChessResult<Unit>   // Ready/Busy: повторний start ігнорується (Ok); Starting: див. семантику нижче. Змінити налаштування: stop() і start(config)
     suspend fun stop()
     suspend fun newGame()                             // UCI "ucinewgame": очищує стан між партіями
     suspend fun bestMove(request: MoveRequest): ChessResult<EngineMove>
@@ -286,6 +290,10 @@ data class AnalysisUpdate(
 - Режим розгортання: in-process JNI чи окремий процес Android Service це деталь реалізації за `EngineService`; контракт однаковий. Прототип етапу 1 порівнює обидва режими, вибір після прототипу (запис у журналі). Критерії порівняння: поведінка при падінні нативного коду, затримка першого ходу й аналізу, споживання пам'яті, складність коду, поведінка при виході у фон. Контрактні тести `EngineService` однакові для обох реалізацій.
 - Позиція без легальних ходів: `bestMove` повертає `Err(NoLegalMoves)`, `analyse` видає `Failed(NoLegalMoves)`. `EngineState` при цьому не змінюється (лишається `Ready`): це очікувана помилка запиту, не збій рушія. Реалізація може перевірити це через `ChessRules` без звернення до Stockfish.
 - Скасування поточного пошуку новим запитом: попередній `bestMove` повертає `Err(Cancelled)`, попередній `analyse` видає `Failed(Cancelled)` і завершується. Скасування збору `Flow` самим споживачем подій не створює (див. нижче).
+- **«Останній запит перемагає» (v0.6):** будь-який запит `bestMove`/`analyse`, прийнятий у стані `Ready`/`Busy`, скасовує попередній пошук, **навіть якщо сам завершиться помилкою** (`NoLegalMoves`, `InvalidFen`, `IllegalMove`). Не скасовують: запит у стані `Stopped`/`Starting`/`Failed` (одразу `EngineUnavailable`, скасовувати нічого) і запит, що порушує передумову контракту (`IllegalArgumentException`, наприклад `Strength.Handicap` у «сирій» реалізації), бо він кидається до прийняття. Причина: UI, перейшовши до нової позиції, має бути певним, що старий пошук зупинено, незалежно від результату нового.
+- **Некоректна позиція в запиті (v0.6):** `startFen` не розбирається → `Err(InvalidFen)` / `Failed(InvalidFen)`; хід у `moves` нелегальний → `Err(IllegalMove)` / `Failed(IllegalMove)`. Як і `NoLegalMoves`, це помилка запиту: стан повертається в `Ready`.
+- **`stop()` під час пошуку (v0.6):** активний пошук завершується `Err(Cancelled)` / `Failed(Cancelled)`, стан `Stopped`. (Не `EngineUnavailable`: пошук перервав сам клієнт, а не збій рушія.)
+- **`start()` у стані `Starting` (v0.6):** повторний виклик не запускає другий рушій, а **чекає завершення поточного запуску й повертає той самий результат** (`Ok` або `Err`). Повертати `Ok` до досягнення `Ready` заборонено: інакше наступний `bestMove` отримає `EngineUnavailable`. Реалізація, у якої запуск атомарний і стан `Starting` ззовні не спостерігається (як у `FakeEngineService`), вимогу виконує автоматично.
 - Оцінки в `AnalysisUpdate.evaluation` завжди з погляду білих. Реалізація `EngineService` отримує `ChessRules` через конструктор (щоб визначити, чия черга ходу в корені пошуку).
 - `analyse`: кожен рядок MultiPV це окрема подія `Update` (поле `multiPv` = 1..N), глибина зростає. Після `Finished` чи `Failed` Flow завершується; скасування збору споживачем подій не створює.
 
@@ -610,7 +618,14 @@ object NoMonetization : Monetization { override val isEnabled = false }
 
 Пише Шахове ядро. Споживачі: `learning`, `app`, контрактні тести. Підключення: `testImplementation(testFixtures(project(":core-chess:api")))`.
 
-Порядок (рішення 2026-10-29): Шахове ядро додає плагін `java-test-fixtures` у `:core-chess:api` разом із `FakeEngineService`. Після цього Android і UI перевіряє підключення в `:app` (Android-модуль) і `:learning`. До того перевірка відкладена: у каркасі ще немає плагіна, перевіряти нічого. Якщо підключення в Android-модулі не спрацює, запасний варіант: окремий JVM-модуль `:core-chess:testing` (рішення Архітектора за запитом).
+Порядок (рішення 2026-10-29): Шахове ядро додає плагін `java-test-fixtures` у `:core-chess:api` разом із `FakeEngineService`. Після цього Android і UI перевіряє підключення в `:app` (Android-модуль) і `:learning`. До того перевірка відкладена: у каркасі ще немає плагіна, перевіряти нічого. Якщо підключення в Android-модулі не спрацює, запасний варіант: окремий JVM-модуль `:core-chess:testing` (рішення Архітектора за запитом). **Статус 2026-10-29:** плагін і `FakeEngineService` є в `main` (PR #4); черга за перевіркою Android і UI.
+
+**`StubRules` у testFixtures не переноситься (рішення Архітектора 2026-10-29).** Він лишається в `core-chess/api/src/test`. Причини:
+- це неповна реалізація `ChessRules`: більшість методів кидає виняток, а `StubPosition` порушує семантику `Position` (черга ходу завжди біла, дошка порожня). У testFixtures він став би публічним тестовим API, і тести `learning` чи `app`, що викликають `isCheckmate`, `toSan` чи `sideToMove` (наприклад, `PuzzleSession`), падали б із незрозумілою помилкою або перевіряли б неправдиву поведінку;
+- справжній `ChessRules` (адаптер chesslib) і так потрібен першим кроком етапу 2. Після нього `FakeEngineService(realRules)` стає основним способом тестування для всіх модулів;
+- до появи справжніх правил модулям достатньо власних локальних заглушок у `src/test` (як приклад можна взяти `StubRules`).
+
+Якщо згодом знадобиться табличний `ChessRules` у фікстурах, Шахове ядро подає запит із повністю визначеною поведінкою всіх методів; тоді це буде окремий контракт.
 
 ```kotlin
 class FakeEngineService(
@@ -633,7 +648,9 @@ class FakeEngineService(
 ```
 
 Поведінка за замовчуванням:
-- `start(config)`: `Stopped → Starting → Ready`; `config` обрізається за `capabilities` і записується в `appliedConfigs`. Повторний `start` у `Ready`/`Busy` повертає `Ok` і нічого не змінює. `capabilities` дорівнює `null` до першого успішного `start`.
+- `start(config)`: `Stopped → Starting → Ready` атомарно (під замком, тому `Starting` ззовні не спостерігається; це виконує вимогу 3.4 щодо `Starting`); `config` обрізається за `capabilities` і записується в `appliedConfigs`. Повторний `start` у `Ready`/`Busy`/`Starting` повертає `Ok` і нічого не змінює. `capabilities` дорівнює `null` до першого успішного `start`.
+- `stop()` під час пошуку: активний пошук → `Err(Cancelled)` / `Failed(Cancelled)`, стан `Stopped` (3.4).
+- Будь-який прийнятий запит, зокрема з `NoLegalMoves` чи некоректною позицією, скасовує попередній пошук (3.4, «останній запит перемагає»).
 - Виклики до `start` або після `stop`: `bestMove` → `Err(EngineUnavailable)`, `analyse` → `Failed(EngineUnavailable)`.
 - `bestMove`: перший легальний хід після сортування за рядком UCI (детерміновано). Позиція без ходів → `Err(NoLegalMoves)`, стан лишається `Ready`.
 - `analyse`: для кожного `multiPv` від 1 до min(запитаний, кількість легальних ходів) одна подія `Update` (глибина 1, `Centipawns(0)`, `pv` з одного ходу в порядку сортування за UCI), потім `Finished`. Позиція без ходів → `Failed(NoLegalMoves)`.
@@ -655,7 +672,8 @@ class FakeEngineService(
 7. Підтвердження Шаховим ядром уточнення v0.4 щодо `positionKey` (взяття на проході лише коли воно легально можливе).
 8. [Пізніше] Алгоритм інтервального повторення, пороги класифікації помилок, схема уроків.
 9. Підтвердження `EngineConfig` і `AnalysisEvent` (3.4) з боку Android і UI.
-10. Сумісність testFixtures `:core-chess:api` з `:app` (7.3): після появи `java-test-fixtures`.
+10. Сумісність testFixtures `:core-chess:api` з `:app` і `:learning` (7.3): `java-test-fixtures` уже є, перевіряє Android і UI.
 
 Закрито у v0.4: розміщення шару Handicap (3.5), `NoLegalMoves` і `InsufficientMaterial` (3.2), набір ABI (7.2).
 Закрито у v0.5: підтвердження розділу 5; конфігурація збірки (1.1).
+Закрито у v0.6: поведінка `start()` у `Starting`, `stop()` під час пошуку, скасування запитами з помилкою (3.4); `StubRules` не переноситься в testFixtures (7.3).
