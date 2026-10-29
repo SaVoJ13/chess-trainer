@@ -1411,7 +1411,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlinx:kotlinx-coroutines-android",
-            "artifactVersion": "1.9.0",
+            "artifactVersion": "1.11.0",
             "name": "kotlinx-coroutines-android",
             "description": "Coroutines support libraries for Kotlin",
             "website": "https://github.com/Kotlin/kotlinx.coroutines",
@@ -1433,7 +1433,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlinx:kotlinx-coroutines-bom",
-            "artifactVersion": "1.9.0",
+            "artifactVersion": "1.11.0",
             "name": "kotlinx-coroutines-bom",
             "description": "Coroutines support libraries for Kotlin",
             "website": "https://github.com/Kotlin/kotlinx.coroutines",
@@ -1455,7 +1455,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlinx:kotlinx-coroutines-core",
-            "artifactVersion": "1.9.0",
+            "artifactVersion": "1.11.0",
             "name": "kotlinx-coroutines-core",
             "description": "Coroutines support libraries for Kotlin",
             "website": "https://github.com/Kotlin/kotlinx.coroutines",

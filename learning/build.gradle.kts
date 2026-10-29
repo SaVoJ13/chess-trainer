@@ -19,4 +19,5 @@ kotlin {
 dependencies {
     implementation(project(":core-chess:api"))
     testImplementation(libs.junit)
+    testImplementation(testFixtures(project(":core-chess:api")))
 }
