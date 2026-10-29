@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="app_name">Шаховий тренер</string>
+    <string name="main_placeholder">Шаховий тренер у розробці</string>
+</resources>

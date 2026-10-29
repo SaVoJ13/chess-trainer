@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Chess Trainer contributors
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+}
+
+// Єдине місце, де задано applicationId (MASTER_SPEC 10). Остаточне значення визначається до етапу 5 (13.2).
+val appId = "org.chesstrainer.app"
+
+android {
+    namespace = "org.chesstrainer.app"
+    compileSdk = 37
+
+    defaultConfig {
+        applicationId = appId
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = "0.1.0"
+
+        // MVP: лише arm64-v8a (MASTER_SPEC 4, CONTRACTS 7.2)
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        compose = true
+    }
+}
+
+dependencies {
+    implementation(project(":learning"))
+    implementation(project(":core-chess:api"))
+    implementation(project(":core-chess:engine-android"))
+
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+
+    testImplementation(libs.junit)
+}
