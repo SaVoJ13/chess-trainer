@@ -19,5 +19,29 @@ kotlin {
 
 dependencies {
     api(libs.kotlinx.coroutines.core)
+    implementation(libs.chesslib)
     testImplementation(libs.junit)
 }
+
+// Perft (CONTRACTS 7.1): JUnit 4 Categories. `test` (і `build`) запускає все, крім глибокого perft.
+val perftDeepCategory = "org.chesstrainer.core.testing.PerftDeep"
+val perftCategory = "org.chesstrainer.core.testing.Perft"
+
+tasks.test {
+    useJUnit { excludeCategories(perftDeepCategory) }
+}
+
+fun registerCategoryTest(name: String, description: String, category: String, heapMb: Int = 1024) =
+    tasks.register<Test>(name) {
+        this.description = description
+        group = "verification"
+        val testSet = sourceSets.test.get()
+        testClassesDirs = testSet.output.classesDirs
+        classpath = testSet.runtimeClasspath
+        maxHeapSize = "${heapMb}m"
+        useJUnit { includeCategories(category) }
+        testLogging { events("passed", "failed"); showStandardStreams = true }
+    }
+
+registerCategoryTest("perftFast", "Швидкий perft (Category Perft)", perftCategory)
+registerCategoryTest("perftDeep", "Глибокий perft (Category PerftDeep)", perftDeepCategory)
