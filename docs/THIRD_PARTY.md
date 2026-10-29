@@ -105,3 +105,24 @@
 | 2026-10-29 | SW-014 | Архітектор | Apache-2.0 за `LICENSE` | github.com/gradle/gradle (гілка `master`) |
 | 2026-10-29 | SW-016 | Архітектор | Умови Android SDK License Agreement прочитано (п. 3.1, 3.4, 3.5, 4.1) | developer.android.com/studio/terms |
 | 2026-10-29 | SW-015 | Архітектор | Не вдалося: Google Maven (dl.google.com) недоступний із середовища | — |
+
+## 6. Нотатка Android і UI для Архітектора (2026-10-29, статуси не змінено)
+
+Ліцензії прочитано в `<licenses>` POM із кешу Gradle (`~/.gradle/caches/modules-2`) після `./gradlew build`; дерево взято з `./gradlew :app:dependencies`. Статус «Перевірено» не ставився. Це не юридична консультація.
+
+| Компонент | Версія | Ліцензія в POM | Де | Ідеться про |
+|---|---|---|---|---|
+| AGP `com.android.tools.build:gradle` | 9.5.0 | The Apache Software License, Version 2.0 | збірка | SW-015 |
+| `androidx.core:core-ktx` | 1.19.1 | The Apache Software License, Version 2.0 | APK | SW-003 |
+| `androidx.activity:activity-compose` | 1.13.0 | The Apache Software License, Version 2.0 | APK | SW-009 |
+| `androidx.compose:compose-bom` | 2026.09.00 | The Apache Software License, Version 2.0 | APK | SW-010 |
+| `junit:junit` | 4.13.2 | Eclipse Public License 1.0 | лише тести | SW-012 |
+| `org.hamcrest:hamcrest-core` (від JUnit, `debugUnitTestRuntimeClasspath`) | 1.3 | у самому POM немає; у батьківському `hamcrest-parent:1.3`: New BSD License | лише тести | SW-013 |
+| Плагін `com.mikepenz.aboutlibraries.plugin.android` | 15.3.0 | у POM маркера плагіна `<licenses>` немає; ліцензія репозиторію Apache-2.0 (SW-006) | збірка | SW-006 |
+
+- Звіт SW-006: `app/licenses/aboutlibraries.json` (`releaseRuntimeClasspath`, 65 бібліотек, у POM усіх 65 лише `Apache-2.0`). Транзитивні: androidx.* (lifecycle, savedstate, collection тощо), `kotlin-stdlib` 2.4.21, `kotlinx-coroutines` 1.9.0, `kotlinx-serialization` 1.7.3, `org.jetbrains:annotations` 23.0.0, `org.jspecify:jspecify` 1.0.0, `com.google.guava:listenablefuture` 1.0 (ліцензія в звіті Apache-2.0). Тестових залежностей у звіті немає (hamcrest лише з таблиці вище).
+- `:core-chess:api` поки без runtime-залежностей, окрім stdlib.
+- Не охоплено: транзитивні залежності самого AGP і Kotlin-плагінів (збірка, у APK не потрапляють); ліцензії на тегах версій не звірялися.
+- У режимі `offlineMode` текст ліцензії у звіті відсутній (Gradle виводить «does not contain the license text»); для екрана ліцензій на етапі 2 потрібні тексти вручну через `collect.configPath`.
+- Версія AboutLibraries: **15.3.0** (сторінка релізів github.com/mikepenz/AboutLibraries/releases 2026-10-29: 15.3.0 позначено Latest, 13 жовтня; 15.2.0 попередня, 28 серпня). Розбіжність у записі Архітектора пояснюється застарілою сторінкою.
+- Контрольна сума wrapper: SHA-256 `gradle-wrapper.jar` у репозиторії `497c8c2a…a194a9c7` збігається зі списком gradle.org/release-checksums для 9.6.0. Додано `distributionSha256Sum` для `gradle-9.6.0-bin.zip`: `bbaeb2fe…2a529a01` (список gradle.org і `services.gradle.org/distributions/gradle-9.6.0-bin.zip.sha256` однакові).

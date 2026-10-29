@@ -4,6 +4,21 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.aboutlibraries.android)
+}
+
+// SW-006: лише офлайн-режим, без звернень до GitHub API (docs/THIRD_PARTY.md).
+// Звіт про залежності зберігається в репозиторії й оновлюється разом із ними.
+aboutLibraries {
+    offlineMode = true
+    collect {
+        fetchRemoteLicense = false
+        fetchRemoteFunding = false
+    }
+    export {
+        outputFile = file("licenses/aboutlibraries.json")
+        prettyPrint = true
+    }
 }
 
 // Єдине місце, де задано applicationId (MASTER_SPEC 10). Остаточне значення визначається до етапу 5 (13.2).
