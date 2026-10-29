@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="prototype_title">EnginePrototype</string>
+    <string name="prototype_remote">Remote (:engine)</string>
+    <string name="prototype_baseline">Force armv8 baseline</string>
+    <string name="prototype_status">%1$s remote=%2$s baseline=%3$s</string>
+    <string name="prototype_done">%1$s done</string>
+</resources>

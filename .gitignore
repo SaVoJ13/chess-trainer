@@ -33,3 +33,6 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Кеш мережі NNUE (98 МБ, завантажується збіркою engine-android)
+.nnue-cache/

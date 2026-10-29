@@ -1,3 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<manifest />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Режим «окремий процес» (CONTRACTS 3.4): прив'язаний Service, не foreground. -->
+        <service
+            android:name="org.chesstrainer.engine.EngineProcessService"
+            android:exported="false"
+            android:process=":engine" />
+    </application>
+</manifest>
