@@ -14,6 +14,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // chesslib (SW-002) розповсюджується лише через JitPack; дозволено тільки цю групу.
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.bhlangonijr") }
+        }
     }
 }
 

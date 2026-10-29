@@ -1,0 +1,37 @@
+% SPDX-License-Identifier: GPL-3.0-or-later
+% SPDX-FileCopyrightText: 2026 Chess Trainer contributors
+[Event "Test Cup"]
+[Site "Kyiv"]
+[Date "2026.10.29"]
+[Round "1"]
+[White "Alice"]
+[Black "Bob"]
+[Result "1-0"]
+[ECO "C20"]
+
+1. e4 {King's pawn} 1... e5 2. Nf3 Nc6 $1 3. Bc4 Bc5 $5 {trailing line comment}
+4. O-O Nf6 5. d3 d6 6. Bg5 h6 7. Bh4 g5 8. Bg3 Nh5 9. Nc3 Nxg3 10. hxg3 Be6 1-0
+
+[Event "Endgame"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "?"]
+[Black "?"]
+[Result "*"]
+[SetUp "1"]
+[FEN "4k3/8/8/8/8/8/4P3/4K3 b - - 0 40"]
+
+40... Kd7 41. Kd2 Kd6 *
+
+[Event "Кубок"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "Ірина"]
+[Black "Оле\"ксій"]
+[Result "1/2-1/2"]
+
+1. d4 d5 {A fairly long comment that has to be wrapped across several lines
+because it is longer than eighty characters} 2. c4 e6 1/2-1/2
+

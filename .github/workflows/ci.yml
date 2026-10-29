@@ -60,5 +60,5 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v6
-      # Gradle-задачу для тегу `perft-deep` надасть Шахове ядро; поки тестів немає.
-      - run: echo "Deep perft tests are not added yet (owner - Chess core)"
+      # Глибокий perft: JUnit Category PerftDeep (CONTRACTS 7.1).
+      - run: ./gradlew :core-chess:api:perftDeep
