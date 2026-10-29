@@ -69,4 +69,5 @@ dependencies {
     implementation(libs.androidx.compose.material3)
 
     testImplementation(libs.junit)
+    testImplementation(testFixtures(project(":core-chess:api")))
 }
