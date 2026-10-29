@@ -32,7 +32,11 @@
 |---|---|
 | Мова | Kotlin |
 | UI | Jetpack Compose |
-| Мінімальна версія Android | API 26 (Android 8.0), `minSdk = 26`. `targetSdk` відповідає актуальній вимозі Google Play (перевіряти перед кожним релізом) |
+| Мінімальна версія Android | API 26 (Android 8.0), `minSdk = 26` |
+| Цільова версія Android | `targetSdk = 36` (Android 16): вимога Google Play для нових застосунків і оновлень з 2026-08-31. Перевіряти перед кожним релізом; наступне підвищення окремим рішенням |
+| Версія SDK для компіляції | `compileSdk = 37` (цього вимагають core-ktx 1.19.1 і Compose runtime 1.12.1). Не змінює поведінку на пристрої, лише доступні API |
+| JDK | Збірка на JDK 17+; CI на JDK 21 (Temurin). Байткод JVM 17 у всіх модулях |
+| Версії інструментів і бібліотек | Лише в `gradle/libs.versions.toml` і `gradle/wrapper/gradle-wrapper.properties`. Кожна залежність спершу в `docs/THIRD_PARTY.md` |
 | Рушій | Stockfish (UCI), зібраний як нативна бібліотека через NDK і викликаний через JNI в підмодулі `core-chess/engine-android`. Не запускається як окремий виконуваний файл. Версія Stockfish фіксується в `docs/THIRD_PARTY.md` |
 | Набір ABI | MVP: лише `arm64-v8a` (релізна й відладкова збірки). Інші ABI після MVP лише окремим рішенням власника. Тестування без x86-емулятора: `docs/CONTRACTS.md`, 7.2 |
 | Шахова модель | FEN, PGN, UCI |
@@ -113,7 +117,7 @@ tests/
 - Іменування:
   - Kotlin за офіційним стилем.
   - Пакети коду: `org.chesstrainer.<модуль>` (`org.chesstrainer.app`, `org.chesstrainer.core`, `org.chesstrainer.engine`, `org.chesstrainer.learning`). Це **робочий простір імен коду**, він не змінюється під час вибору остаточної назви.
-  - `applicationId` для Google Play задається окремо в одному місці конфігурації збірки й визначається до етапу 5 (розділ 13.2). Відладкова збірка має суфікс `.debug`.
+  - `applicationId` для Google Play задається лише в одному місці: змінна `appId` у `app/build.gradle.kts`. **Тимчасове значення `org.chesstrainer.app`**; остаточне визначається до етапу 5 (розділ 13.2) і після публікації не змінюється. Відладкова збірка має суфікс `.debug`. `namespace` модулів (`org.chesstrainer.app`, `org.chesstrainer.engine`) від `applicationId` не залежить і при зміні назви не змінюється.
   - Робоча назва застосунку: «Шаховий тренер» / «Chess Trainer» (рядок `app_name`). Остаточна назва не блокує розробку.
   - Ключі рядків: `snake_case` з префіксом екрана або домену (`game_`, `puzzle_`, `puzzle_theme_<id>`, `difficulty_<id>`).
 - Гілки: `feature/<модуль>` (`feature/core-chess-api`, `feature/engine-android`, `feature/app`, `feature/learning`, `feature/content`), у `main` через перевірку.
@@ -171,10 +175,12 @@ tests/
 | Набір ABI для MVP | Лише `arm64-v8a` |
 | Назва | Робоча назва «Шаховий тренер» / «Chess Trainer» і простір імен коду `org.chesstrainer.*`. Остаточна назва не блокує розробку |
 | Бібліотека правил | За інтерфейсом `ChessRules`; умовно chesslib 1.3.7, остаточно після perft у CI; запасний варіант власна реалізація |
+| Конфігурація збірки (2026-10-29) | `targetSdk 36`, `compileSdk 37`, JDK 21 у CI, тимчасовий `applicationId` `org.chesstrainer.app` (розділи 4 і 10) |
+| Інструмент ліцензій залежностей (2026-10-29) | AboutLibraries у режимі без мережі (`docs/THIRD_PARTY.md`, SW-006) |
 
 ### 13.2 Відкриті питання
 
-- **Остаточна назва й `applicationId`** (до етапу 5). Перевірити унікальність у Google Play, F-Droid, GitHub, базах торговельних марок. `applicationId` після публікації не змінюється.
+- **Остаточна назва й `applicationId`** (до етапу 5). Зараз тимчасово `org.chesstrainer.app`. Перевірити унікальність у Google Play, F-Droid, GitHub, базах торговельних марок. `applicationId` після публікації не змінюється.
 - **Остаточне підтвердження бібліотеки правил** (Шахове ядро): perft у CI, збірка під Android.
 - **Режим розгортання рушія** (in-process чи окремий процес): після прототипу на реальному `arm64-v8a`-пристрої.
 - **Джерела навчального контенту:** перевірка ліцензій кандидатів у `docs/THIRD_PARTY.md`.

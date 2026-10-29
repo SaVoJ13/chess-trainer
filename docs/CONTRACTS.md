@@ -1,6 +1,6 @@
 # CONTRACTS — контракти між модулями
 
-Статус: **ЧЕРНЕТКА v0.4** (Архітектор, 2026-10-28). Злиту версію v0.3 (правки Шахового ядра + розділи 7.1 і 7.2 Архітектора) Архітектор переглянув і підтвердив з уточненнями v0.4. Структуру модулів погоджено власником. Шахове ядро підтвердило розділи 2 і 3. Сигнатури остаточні після підтвердження Android і UI (розділи 3.4, 3.5, 5) і Навчання і контент (розділ 4).
+Статус: **ЧЕРНЕТКА v0.5** (Архітектор, 2026-10-29). Структуру модулів погоджено власником і реалізовано в каркасі Gradle (PR #1). Підтверджено: розділи 2 і 3 (Шахове ядро), розділ 5 (Android і UI, закрито рішенням власника 2026-10-29). Чекають підтвердження: `EngineConfig` і `AnalysisEvent` у 3.4 з боку Android і UI; розділ 4 (Навчання і контент).
 Підпорядковується `MASTER_SPEC.md`. Якщо є суперечність, діє специфікація.
 
 Код нижче це **специфікація інтерфейсів** (сигнатури й семантика), а не готова реалізація.
@@ -16,6 +16,11 @@
 - Уточнено: `positionKey` враховує поле взяття на проході лише коли взяття **легально** можливе (2); `NoLegalMoves` не змінює `EngineState` (3.4); у чому саме полягає скасування для `bestMove` і `analyse` (3.4); діапазони UCI_Elo і Skill Level для `sf_19` (3.5, вимога 1).
 - Виправлено: коментар до `SearchLimit` посилався на неіснуюче `AnalysisRequest.infinite` (3.4).
 - Рішення власника: набір ABI для MVP лише `arm64-v8a` (7.2).
+
+**Зміни v0.4 → v0.5** (Архітектор і власник, 2026-10-29; сигнатури не змінювались):
+- Додано: розділ 1.1 «Конфігурація збірки» (`minSdk 26`, `targetSdk 36`, `compileSdk 37`, JVM 17, JDK 21 у CI, тимчасовий `applicationId`).
+- Підтверджено: розділ 5 (Android і UI).
+- Уточнено: підключення testFixtures (7.3) перевіряється після появи плагіна `java-test-fixtures` у `:core-chess:api`; JDK і версії дій у CI (7.1).
 
 **Позначки:**
 - **[MVP]**: реалізується на етапі 2, сигнатура фіксується зараз.
@@ -49,6 +54,23 @@ content/ : лише дані, читаються через порт ContentSour
 - **Незмінність:** усі моделі це immutable `data class`.
 - **Продуктивність:** синхронні функції `ChessRules` не блокують понад кілька мс. Довше (рушій, імпорт великого PGN) лише `suspend`/`Flow`.
 - **Стабільні ідентифікатори:** усі `id`, що зберігаються в БД (рівні складності, задачі, теми), ніколи не використовуються повторно для іншого змісту.
+
+### 1.1 Конфігурація збірки [MVP]
+
+Зафіксовано 2026-10-29 за каркасом Gradle (PR #1). Змінює Android і UI лише після рішення Архітектора (MASTER_SPEC 4).
+
+| Параметр | Значення | Де задано |
+|---|---|---|
+| `minSdk` | 26 | `app`, `core-chess/engine-android` |
+| `targetSdk` | 36 | `app` |
+| `compileSdk` | 37 | `app`, `core-chess/engine-android` |
+| Байткод JVM | 17 (`sourceCompatibility`/`targetCompatibility`, `jvmTarget`) у всіх модулях; без `jvmToolchain` | усі `build.gradle.kts` |
+| JDK для збірки | 17+ локально; 21 (Temurin) у CI | `.github/workflows/ci.yml` |
+| ABI | лише `arm64-v8a` (`ndk.abiFilters`) | `app`, `core-chess/engine-android` |
+| `applicationId` | тимчасово `org.chesstrainer.app`; debug `org.chesstrainer.app.debug` | змінна `appId` у `app/build.gradle.kts`, більше ніде |
+| `namespace` | `org.chesstrainer.app`, `org.chesstrainer.engine` | не залежить від `applicationId` |
+| Версії залежностей | лише `gradle/libs.versions.toml` (Gradle: `gradle-wrapper.properties`) | кожна спершу в `THIRD_PARTY.md` |
+| Дозвіл `INTERNET` | відсутній | `app/src/main/AndroidManifest.xml` |
 
 ## 2. Спільні типи (`:core-chess:api`, пакет `org.chesstrainer.core.model`) [MVP]
 
@@ -568,7 +590,8 @@ object NoMonetization : Monetization { override val isEnabled = false }
 - Perft виконується на JVM (`:core-chess:api`), без емулятора й без Android.
 - Нативний код Stockfish у CI перевіряється збіркою для всіх ABI зі списку (MASTER_SPEC 4). Запуск на пристрої лише вручну (MASTER_SPEC 11).
 - **Не ставити фільтр `paths` у workflow, чий статус зроблено обов'язковим (Required) для `main`:** pull request, що не чіпає ці шляхи, ніколи не отримає статус перевірки й зависне в очікуванні.
-- Версії дій GitHub (`actions/checkout`, `setup-java`, `setup-gradle`) і версію JDK узгодити з AGP та звірити з актуальною документацією перед додаванням.
+- JDK у CI: 21 (Temurin). Версії дій GitHub фіксуються в `ci.yml` (на 2026-10-29: `actions/checkout@v7`, `actions/setup-java@v6`, `gradle/actions/setup-gradle@v6`); оновлюються разом із перевіркою сумісності з AGP. Перший прогін CI на GitHub пройшов (PR #1).
+- Job `perft-deep` поки заглушка; Шахове ядро замінює її на Gradle-задачу разом із першими perft-тестами.
 
 ### 7.2 Набір ABI і тестування без емулятора x86 [MVP]
 
@@ -585,7 +608,9 @@ object NoMonetization : Monetization { override val isEnabled = false }
 
 ### 7.3 `FakeEngineService` (testFixtures `:core-chess:api`) [MVP]
 
-Пише Шахове ядро. Споживачі: `learning`, `app`, контрактні тести. Підключення: `testFixtures(project(":core-chess:api"))` (сумісність testFixtures чистого JVM-модуля з Android-модулем `:app` перевіряє Android і UI під час створення каркаса).
+Пише Шахове ядро. Споживачі: `learning`, `app`, контрактні тести. Підключення: `testImplementation(testFixtures(project(":core-chess:api")))`.
+
+Порядок (рішення 2026-10-29): Шахове ядро додає плагін `java-test-fixtures` у `:core-chess:api` разом із `FakeEngineService`. Після цього Android і UI перевіряє підключення в `:app` (Android-модуль) і `:learning`. До того перевірка відкладена: у каркасі ще немає плагіна, перевіряти нічого. Якщо підключення в Android-модулі не спрацює, запасний варіант: окремий JVM-модуль `:core-chess:testing` (рішення Архітектора за запитом).
 
 ```kotlin
 class FakeEngineService(
@@ -629,5 +654,8 @@ class FakeEngineService(
 6. Пропозиція нічиєї в грі проти рушія (5).
 7. Підтвердження Шаховим ядром уточнення v0.4 щодо `positionKey` (взяття на проході лише коли воно легально можливе).
 8. [Пізніше] Алгоритм інтервального повторення, пороги класифікації помилок, схема уроків.
+9. Підтвердження `EngineConfig` і `AnalysisEvent` (3.4) з боку Android і UI.
+10. Сумісність testFixtures `:core-chess:api` з `:app` (7.3): після появи `java-test-fixtures`.
 
 Закрито у v0.4: розміщення шару Handicap (3.5), `NoLegalMoves` і `InsufficientMaterial` (3.2), набір ABI (7.2).
+Закрито у v0.5: підтвердження розділу 5; конфігурація збірки (1.1).
