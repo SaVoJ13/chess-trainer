@@ -32,12 +32,28 @@ internal object PrototypeHost {
         val current = scenarios.get()?.takeIf { it.first == key }?.second
             ?: PrototypeScenarios(context.applicationContext, mode, baseline).also { scenarios.set(key to it) }
         scope.launch {
+            val watchdog = startWatchdog(request)
             try {
                 current.run(name, repeat)
             } finally {
+                watchdog.interrupt()
                 running.set(null)
                 onDone()
             }
         }
     }
 }
+
+/** Debug: якщо сценарій не завершується, раз на 90 с пише стеки всіх потоків процесу застосунку. */
+private fun startWatchdog(request: String): Thread = Thread({
+    try {
+        while (true) {
+            Thread.sleep(90_000)
+            Log.w("EnginePrototype", "WATCHDOG $request still running; thread dump follows")
+            for ((thread, stack) in Thread.getAllStackTraces()) {
+                Log.w("EnginePrototype", "WATCHDOG thread ${thread.name}: " + stack.take(12).joinToString(" <- "))
+            }
+        }
+    } catch (_: InterruptedException) {
+    }
+}, "prototype-watchdog").also { it.isDaemon = true; it.start() }
