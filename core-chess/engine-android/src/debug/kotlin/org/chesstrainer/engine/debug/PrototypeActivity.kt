@@ -67,12 +67,12 @@ class PrototypeActivity : Activity() {
         val scenario = intent.getStringExtra("scenario") ?: return
         val remote = intent.getStringExtra("mode") == "remote"
         remoteSwitch.isChecked = remote
-        launchScenario(scenario, remote, intent.getBooleanExtra("baseline", false), intent.getIntExtra("repeat", 5))
+        launchScenario(scenario, remote, intent.getBooleanExtra("baseline", false), intent.getIntExtra("repeat", 5), intent.getBooleanExtra("nowait", false))
     }
 
-    private fun launchScenario(name: String, remote: Boolean, baseline: Boolean, repeat: Int) {
+    private fun launchScenario(name: String, remote: Boolean, baseline: Boolean, repeat: Int, noWait: Boolean = false) {
         status.text = getString(R.string.prototype_status, name, remote.toString(), baseline.toString())
-        PrototypeHost.launch(applicationContext, name, remote, baseline, repeat) {
+        PrototypeHost.launch(applicationContext, name, remote, baseline, repeat, noWait) {
             runOnUiThread { status.text = getString(R.string.prototype_done, name) }
         }
     }
@@ -85,7 +85,7 @@ class PrototypeActivity : Activity() {
     private companion object {
         val SCENARIOS = listOf(
             "hello", "contract", "cold", "restart", "bestmove", "ipc", "analyse",
-            "memory", "crash", "bgprep", "bgcheck", "stop",
+            "memory", "crash", "bgprep", "bgcheck", "stop", "hang", "soak", "soaklong", "stream", "memstop", "dotcmp", "nnuefifo",
         )
     }
 }

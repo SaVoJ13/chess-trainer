@@ -6,10 +6,13 @@ package org.chesstrainer.engine
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +53,7 @@ import org.chesstrainer.core.rules.ChessRules
 open class UciEngineService internal constructor(
     private val transport: UciTransport,
     private val rules: ChessRules,
+    private val timeouts: EngineTimeouts = EngineTimeouts(),
 ) : EngineService {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -61,6 +65,9 @@ open class UciEngineService internal constructor(
     @Volatile private var session: Session? = null
     @Volatile private var current: Search? = null
     private var startResult: CompletableDeferred<ChessResult<Unit>>? = null
+
+    /** Закриття транспорту виконується поза викликачем (воно може зависнути); наступний запуск його чекає. */
+    @Volatile private var pendingClose: Deferred<*>? = null
 
     override val state: StateFlow<EngineState> = _state.asStateFlow()
     override val capabilities: EngineCapabilities? get() = _capabilities
@@ -84,21 +91,37 @@ open class UciEngineService internal constructor(
         joined?.let { return it.await() }
         val pending = started!!
         // Запуск не переривається скасуванням викликача: інакше стан застряг би в Starting.
-        val result = withContext(NonCancellable + Dispatchers.IO) { doStart(config) }
+        val result = withContext(NonCancellable) { startBounded(config) }
         synchronized(guard) { startResult = null }
         pending.complete(result)
         return result
     }
 
-    private suspend fun doStart(config: EngineConfig): ChessResult<Unit> {
+    /** Запуск не довший за [EngineTimeouts.startMs]: блокувальний `open` іде окремо, зависання стає помилкою. */
+    private suspend fun startBounded(config: EngineConfig): ChessResult<Unit> {
+        EngineTrace.mark("start.begin")
+        withTimeoutOrNull(timeouts.closeWaitMs) { pendingClose?.await() }
         val session = Session()
         this.session = session
+        val job = scope.async(Dispatchers.IO) { doStart(session, config) }
+        val result = withTimeoutOrNull(timeouts.startMs) { job.await() }
+        if (result != null) {
+            EngineTrace.mark("start.end", if (result is ChessResult.Ok) "ok" else "err")
+            return result
+        }
+        job.cancel()
+        EngineTrace.mark("start.timeout")
+        return failStart(session, ChessError.EngineUnavailable("engine did not start in ${timeouts.startMs} ms"))
+    }
+
+    private suspend fun doStart(session: Session, config: EngineConfig): ChessResult<Unit> {
         val evalFile = try {
             transport.open(session.listener)
         } catch (t: Throwable) {
             return failStart(session, ChessError.EngineUnavailable("cannot open engine: $t"))
         }
         session.dispatcher = scope.launch { dispatch(session) }
+        session.lastLineAt = System.nanoTime()
 
         val handshake = mutableListOf<String>()
         val uciOk = exchange(session, listOf("uci"), UCI_TIMEOUT_MS, collect = { handshake += it }) { it == "uciok" }
@@ -117,7 +140,7 @@ open class UciEngineService internal constructor(
                 "setoption name EvalFile value $evalFile",
                 "isready",
             ),
-            READY_TIMEOUT_MS,
+            timeouts.startMs,
             collect = { if (it.contains("ERROR", ignoreCase = true)) errors += it },
         ) { it == "readyok" }
         if (ready != Exchange.Done) return failStart(session, exchangeError(ready, "isready"))
@@ -126,8 +149,11 @@ open class UciEngineService internal constructor(
         }
         _capabilities = caps
         synchronized(guard) {
-            // Збій під час запуску вже міг перевести стан у Failed (див. onClosed).
-            if (_state.value == EngineState.Starting) _state.value = EngineState.Ready
+            // Збій або таймаут під час запуску вже міг перевести стан у Failed (див. onClosed, startBounded).
+            if (_state.value == EngineState.Starting && this.session === session) _state.value = EngineState.Ready
+        }
+        if (_state.value == EngineState.Ready && this.session === session) {
+            session.watchdog = scope.launch { watch(session) }
         }
         return if (_state.value == EngineState.Ready) {
             ChessResult.Ok(Unit)
@@ -138,10 +164,19 @@ open class UciEngineService internal constructor(
 
     private fun failStart(session: Session, error: ChessError): ChessResult<Unit> {
         session.expectedClose.set(true)
-        runCatching { transport.close() }
+        closeTransportAsync()
         session.dispatcher?.cancel()
-        synchronized(guard) { _state.value = EngineState.Failed(error) }
+        session.watchdog?.cancel()
+        synchronized(guard) { if (this.session === session) _state.value = EngineState.Failed(error) }
+        EngineTrace.mark("start.failed", error::class.simpleName)
         return ChessResult.Err(error)
+    }
+
+    /** Закриває транспорт у фоні: при зависанні `close` блокується, і викликач не повинен його чекати. */
+    private fun closeTransportAsync(): Deferred<*> {
+        val job = scope.async(Dispatchers.IO) { runCatching { transport.close() } }
+        pendingClose = job
+        return job
     }
 
     private fun exchangeError(outcome: Exchange, what: String): ChessError = when (outcome) {
@@ -163,21 +198,29 @@ open class UciEngineService internal constructor(
             search?.engineIdle?.complete(Unit)
             _state.value = EngineState.Stopped
         }
-        withContext(NonCancellable + Dispatchers.IO) {
-            runCatching { transport.close() }
+        EngineTrace.mark("stop.begin")
+        oldSession?.watchdog?.cancel()
+        withContext(NonCancellable) {
+            val closing = closeTransportAsync()
+            val closed = withTimeoutOrNull(timeouts.closeWaitMs) { closing.await() } != null
             oldSession?.dispatcher?.cancel()
+            EngineTrace.mark("stop.end", if (closed) "closed" else "close-pending")
         }
     }
 
     /** Налагодження: аварійне завершення нативного коду (`abort()`); працює лише в debug-збірці застосунку. */
     fun crashNativeForTest() = transport.crash()
 
+    /** Налагодження (G3): рядки `info … pv`, прочитані рушієм на його боці з початку поточного відкриття. */
+    fun emittedInfoLinesForTest(): Long = transport.emittedInfoLines()
+
     override suspend fun newGame() {
         lock.withLock {
             if (!isRunning()) return
             if (!cancelCurrentAndWait()) return
             val session = session ?: return
-            exchange(session, listOf("ucinewgame", "isready"), READY_TIMEOUT_MS) { it == "readyok" }
+            val outcome = exchange(session, listOf("ucinewgame", "isready"), timeouts.livenessMs) { it == "readyok" }
+            if (outcome == Exchange.Timeout) onUnavailable(session, "engine did not answer 'ucinewgame' in time")
         }
     }
 
@@ -190,8 +233,14 @@ open class UciEngineService internal constructor(
             is Begun.Rejected -> return ChessResult.Err(begun.error)
             is Begun.Started -> begun.search
         }
+        val running = session
+        val bound = searchBoundMs(request.level.limit)
         try {
-            return search.moveResult.await()
+            val result = if (bound == null) search.moveResult.await() else withTimeoutOrNull(bound) { search.moveResult.await() }
+            if (result != null) return result
+            val reason = "engine did not return bestmove within $bound ms"
+            onUnavailable(running, reason)
+            return ChessResult.Err(ChessError.EngineUnavailable(reason))
         } finally {
             if (!search.finished.get()) abandon(search)
         }
@@ -206,7 +255,10 @@ open class UciEngineService internal constructor(
             is Begun.Started -> begun.search
         }
         try {
-            for (event in search.events) emit(event)
+            for (event in search.events) {
+                if (event is AnalysisEvent.Update) EngineStats.delivered(System.nanoTime() - (search.stamps.poll() ?: System.nanoTime()))
+                emit(event)
+            }
         } finally {
             // Споживач пішов: UCI "stop"; стан повернеться в Ready, коли рушій надішле bestmove.
             if (!search.finished.get()) abandon(search)
@@ -278,6 +330,21 @@ open class UciEngineService internal constructor(
         Begun.Started(search)
     }
 
+    /**
+     * Верхня межа очікування `bestmove` (CONTRACTS 3.4, v0.8): час пошуку плюс запас. Пошук зупиняє перший
+     * досягнутий ліміт, тому береться найменша з оцінок. Оцінки за `depth` і `nodes` грубі й свідомо щедрі
+     * (2 с на ply, 5 тис. вузлів/с); `moveTimeMs` точний. `null` — ліміту немає, діє лише сторожовий механізм.
+     */
+    private fun searchBoundMs(limit: SearchLimit?): Long? {
+        if (limit == null) return null
+        val estimates = listOfNotNull(
+            limit.moveTimeMs,
+            limit.depth?.let { it.coerceAtLeast(1) * 2_000L },
+            limit.nodes?.let { it * 1_000L / 5_000L },
+        )
+        return estimates.minOrNull()?.plus(timeouts.searchGraceMs)
+    }
+
     private fun goArguments(limit: SearchLimit?): String {
         if (limit == null) return "infinite"
         return buildList {
@@ -304,9 +371,9 @@ open class UciEngineService internal constructor(
         old.finish(ChessError.Cancelled)
         if (!old.engineIdle.isCompleted) {
             transport.send("stop")
-            val answered = withTimeoutOrNull(STOP_TIMEOUT_MS) { old.engineIdle.await() }
+            val answered = withTimeoutOrNull(timeouts.stopMs) { old.engineIdle.await() }
             if (answered == null) {
-                onCrashed(session, "engine ignored stop")
+                onUnavailable(session, "engine ignored stop")
                 return false
             }
         }
@@ -341,7 +408,7 @@ open class UciEngineService internal constructor(
     // --- рядки від рушія ---
 
     private sealed interface Incoming {
-        class Line(val text: String) : Incoming
+        class Line(val text: String, val readAtNs: Long) : Incoming
         class Closed(val crashed: Boolean, val reason: String) : Incoming
     }
 
@@ -353,10 +420,18 @@ open class UciEngineService internal constructor(
         val expectedClose = AtomicBoolean(false)
         @Volatile var tap: ((String) -> Unit)? = null
         @Volatile var dispatcher: Job? = null
+        @Volatile var watchdog: Job? = null
+
+        /** Час (nanoTime) останнього рядка від рушія: основа сторожового механізму. */
+        @Volatile var lastLineAt = System.nanoTime()
+        private val sawFirstLine = AtomicBoolean(false)
 
         val listener = object : UciTransport.Listener {
-            override fun onLine(line: String) {
-                incoming.trySend(Incoming.Line(line))
+            override fun onLine(line: String, readAtNs: Long) {
+                lastLineAt = System.nanoTime()
+                if (sawFirstLine.compareAndSet(false, true)) EngineTrace.mark("uci.first-line")
+                if (line.startsWith("info ") && line.contains(" pv ")) EngineStats.received()
+                incoming.trySend(Incoming.Line(line, readAtNs))
             }
 
             override fun onClosed(crashed: Boolean, reason: String) {
@@ -370,7 +445,7 @@ open class UciEngineService internal constructor(
             when (item) {
                 is Incoming.Line -> {
                     session.tap?.invoke(item.text)
-                    if (session === this.session) onSearchLine(item.text)
+                    if (session === this.session) onSearchLine(item.text, item.readAtNs)
                 }
                 is Incoming.Closed -> {
                     session.closed.complete(Unit)
@@ -407,10 +482,13 @@ open class UciEngineService internal constructor(
         }
     }
 
-    private fun onSearchLine(line: String) {
+    private fun onSearchLine(line: String, readAtNs: Long) {
         val search = current ?: return
         when {
-            line.startsWith("info ") -> if (search.analysis) parseInfo(line, search.rootBlack)?.let { search.emit(it) }
+            line.startsWith("info ") -> if (search.analysis) {
+                val update = parseInfo(line, search.rootBlack)
+                if (update != null) search.emit(update, readAtNs) else if (line.contains(" pv ")) EngineStats.skipped()
+            }
             line.startsWith("bestmove") -> onBestMove(search, line)
         }
     }
@@ -435,8 +513,41 @@ open class UciEngineService internal constructor(
         search.engineIdle.complete(Unit)
     }
 
-    private fun onCrashed(from: Session?, reason: String) {
-        val error = ChessError.EngineCrashed(reason)
+    private fun onCrashed(from: Session?, reason: String) = onFailed(from, ChessError.EngineCrashed(reason))
+
+    /** Рушій живий, але мовчить або не виконує запит: те саме, що збій, лише з іншою помилкою. */
+    private fun onUnavailable(from: Session?, reason: String) {
+        EngineTrace.mark("watchdog.unavailable", reason)
+        onFailed(from, ChessError.EngineUnavailable(reason))
+    }
+
+    /**
+     * Сторожовий механізм (CONTRACTS 3.4, v0.8). Рушій, що 10 с не дав жодного рядка, хоча йому надсилали
+     * службовий запит `isready` (на нього Stockfish відповідає `readyok` навіть під час пошуку), вважається
+     * недоступним. Довгі паузи між `info` у нескінченному аналізі зависанням не є: `readyok` надходить і так.
+     */
+    private suspend fun watch(session: Session) {
+        var lastPing = 0L
+        while (true) {
+            delay(timeouts.tickMs)
+            if (this.session !== session) return
+            val state = _state.value
+            if (state != EngineState.Ready && state != EngineState.Busy) return
+            val now = System.nanoTime()
+            val idleMs = (now - session.lastLineAt) / 1_000_000
+            // Крок опитування віднімається, щоб відмова настала не пізніше livenessMs від останнього рядка.
+            if (idleMs >= timeouts.livenessMs - timeouts.tickMs) {
+                onUnavailable(session, "engine did not answer liveness probe in ${timeouts.livenessMs} ms")
+                return
+            }
+            if (idleMs >= timeouts.pingAfterMs && (now - lastPing) / 1_000_000 >= timeouts.pingAfterMs) {
+                lastPing = now
+                scope.launch(Dispatchers.IO) { runCatching { transport.send("isready") } }
+            }
+        }
+    }
+
+    private fun onFailed(from: Session?, error: ChessError) {
         synchronized(guard) {
             if (from != null && from !== session) return
             if (_state.value == EngineState.Stopped) return
@@ -447,7 +558,8 @@ open class UciEngineService internal constructor(
             search?.engineIdle?.complete(Unit)
         }
         from?.expectedClose?.set(true)
-        scope.launch(Dispatchers.IO) { runCatching { transport.close() } }
+        from?.watchdog?.cancel()
+        closeTransportAsync()
     }
 
     // --- розбір UCI ---
@@ -490,8 +602,14 @@ open class UciEngineService internal constructor(
         val events = Channel<AnalysisEvent>(Channel.UNLIMITED)
         val finished = AtomicBoolean(false)
 
-        fun emit(update: AnalysisUpdate) {
-            if (!finished.get()) events.trySend(AnalysisEvent.Update(update))
+        /** Часи прочитання рядків рушієм, у порядку `Update` у [events]: для виміру затримки доставки (G3). */
+        val stamps = java.util.concurrent.ConcurrentLinkedQueue<Long>()
+
+        fun emit(update: AnalysisUpdate, readAtNs: Long) {
+            if (finished.get()) return
+            EngineStats.parsed()
+            stamps.add(readAtNs)
+            events.trySend(AnalysisEvent.Update(update))
         }
 
         fun complete(move: EngineMove) {
@@ -520,13 +638,30 @@ open class UciEngineService internal constructor(
 
     private companion object {
         const val UCI_TIMEOUT_MS = 10_000L
-        const val READY_TIMEOUT_MS = 120_000L
-        const val STOP_TIMEOUT_MS = 5_000L
 
         // option name <ім'я> type <тип> [default <v>] [min <n>] [max <n>] [var ...]
         val OPTION = Regex("""option name (.+?) type (\w+)(?: default (?:\S+|<empty>))?(?: min (-?\d+))?(?: max (-?\d+))?.*""")
     }
 }
+
+/**
+ * Таймаути [UciEngineService] (CONTRACTS 3.4, v0.8). Типові значення це контрактні; інші лише для тестів.
+ *
+ * @property startMs `start()` у цілому, зокрема перший запуск із копіюванням мережі.
+ * @property searchGraceMs запас до очікуваного часу пошуку для `bestMove`.
+ * @property livenessMs скільки рушій може мовчати попри службовий запит.
+ * @property stopMs очікування `bestmove` після UCI `stop` при скасуванні пошуку.
+ * @property closeWaitMs скільки `stop()`/наступний `start()` чекають закриття транспорту.
+ */
+internal data class EngineTimeouts(
+    val startMs: Long = 15_000,
+    val searchGraceMs: Long = 5_000,
+    val livenessMs: Long = 10_000,
+    val stopMs: Long = 5_000,
+    val closeWaitMs: Long = 5_000,
+    val tickMs: Long = 250,
+    val pingAfterMs: Long = 2_000,
+)
 
 /** Розбір рядка `info ... multipv N score cp|mate X ... pv ...`; `null`, якщо рядок не оновлення пошуку. */
 internal fun parseInfo(line: String, rootBlack: Boolean): AnalysisUpdate? {

@@ -14,6 +14,7 @@ internal class JniTransport(
     private val appContext = context.applicationContext
     private var reader: Thread? = null
     private var closing = AtomicBoolean(false)
+    private val infoLines = java.util.concurrent.atomic.AtomicLong()
 
     /** Трасування UCI: `adb shell setprop log.tag.SfUci DEBUG`. */
     private val trace get() = android.util.Log.isLoggable("SfUci", android.util.Log.DEBUG)
@@ -24,6 +25,7 @@ internal class JniTransport(
         android.util.Log.i("EnginePrototype", "engine library ${NativeEngine.loadedLibrary} in pid ${android.os.Process.myPid()}")
         closing = AtomicBoolean(false)
         val expected = closing
+        infoLines.set(0)
         val rc = NativeEngine.nativeStart()
         check(rc >= 0) { "nativeStart failed: $rc" }
         reader = Thread({
@@ -35,7 +37,8 @@ internal class JniTransport(
                     return@Thread
                 }
                 if (trace) android.util.Log.d("SfUci", "< $line")
-                listener.onLine(line)
+                if (line.startsWith("info ") && line.contains(" pv ")) infoLines.incrementAndGet()
+                listener.onLine(line, System.nanoTime())
             }
         }, "sf-reader").also { it.isDaemon = true; it.start() }
         return evalFile.absolutePath
@@ -52,6 +55,8 @@ internal class JniTransport(
         reader?.join(2000)
         reader = null
     }
+
+    override fun emittedInfoLines(): Long = infoLines.get()
 
     override fun crash() {
         NativeEngine.nativeCrash()
