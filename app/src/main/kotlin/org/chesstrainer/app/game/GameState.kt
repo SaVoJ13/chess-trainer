@@ -81,6 +81,10 @@ data class GameUiState(
     val endedBy: GameOutcome? = null,
     /** Кількість півходів, на якій людина обрала «Продовжити» у смузі нічиєї. */
     val claimDismissedAtPly: Int? = null,
+    /** Триває перевірка збереженої партії при запуску: хід поки не дозволено. */
+    val awaitingResume: Boolean = false,
+    /** Кількість півходів у збереженій незавершеній партії, яку запропоновано продовжити. */
+    val resumeOfferPlies: Int? = null,
     /** Король під шахом, якщо є. */
     val checkSquare: Square? = null,
 ) {
@@ -100,8 +104,8 @@ data class GameUiState(
     }
 
     val isOver: Boolean get() = outcome != null
-    val humanToMove: Boolean get() = !isOver && position.sideToMove == playerColor
-    val engineToMove: Boolean get() = !isOver && position.sideToMove == engineColor
+    val humanToMove: Boolean get() = !isOver && !awaitingResume && position.sideToMove == playerColor
+    val engineToMove: Boolean get() = !isOver && !awaitingResume && position.sideToMove == engineColor
 
     /** Скільки півходів скасувати, щоб знову ходила людина. */
     val undoPlies: Int get() = if (position.sideToMove == playerColor) 2 else 1

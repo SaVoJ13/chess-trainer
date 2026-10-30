@@ -43,10 +43,14 @@
     <string name="game_dialog_resign_title">Resign the game?</string>
     <string name="game_dialog_resign_text">The game will end with a loss.</string>
     <string name="game_dialog_new_game_title">Start a new game?</string>
-    <string name="game_dialog_new_game_in_progress">The current game will be lost.</string>
+    <string name="game_dialog_new_game_in_progress">The current game will be left unfinished.</string>
     <string name="game_dialog_play_white">Play as White</string>
     <string name="game_dialog_play_black">Play as Black</string>
     <string name="game_promotion_title">Promote the pawn to</string>
+    <string name="game_resume_title">Continue your game?</string>
+    <string name="game_resume_text">You have an unfinished game against the engine.</string>
+    <string name="game_resume_continue">Continue</string>
+    <string name="game_resume_new_game">New game</string>
 
     <!-- Game screen: accessibility -->
     <string name="game_cd_board">Chessboard</string>

@@ -119,6 +119,9 @@ fun GameScreen(controller: GameController) {
             onDismiss = { dialog = GameDialog.NONE },
         )
     }
+    if (state.resumeOfferPlies != null) {
+        ResumeDialog(onContinue = controller::continueSavedGame, onNewGame = controller::declineSavedGame)
+    }
     state.pendingPromotion?.let {
         PromotionDialog(color = state.playerColor, onChoose = controller::choosePromotion, onDismiss = controller::cancelPromotion)
     }
@@ -377,6 +380,26 @@ private fun PromotionDialog(color: ChessColor, onChoose: (PieceType) -> Unit, on
         dismissButton = {
             TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = MinTouch)) {
                 Text(stringResource(R.string.common_cancel))
+            }
+        },
+    )
+}
+
+/** Пропозиція при запуску: продовжити збережену партію чи почати нову. Закрити, не обравши, не можна. */
+@Composable
+private fun ResumeDialog(onContinue: () -> Unit, onNewGame: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text(stringResource(R.string.game_resume_title)) },
+        text = { Text(stringResource(R.string.game_resume_text)) },
+        confirmButton = {
+            Button(onClick = onContinue, modifier = Modifier.heightIn(min = MinTouch)) {
+                Text(stringResource(R.string.game_resume_continue))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onNewGame, modifier = Modifier.heightIn(min = MinTouch)) {
+                Text(stringResource(R.string.game_resume_new_game))
             }
         },
     )

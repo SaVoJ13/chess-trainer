@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.chesstrainer.app.storage.GameStorage
 import org.chesstrainer.core.engine.EngineService
 import org.chesstrainer.core.game.DefaultChessGameFactory
 import org.chesstrainer.core.rules.ChesslibRules
@@ -34,10 +35,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         engine = engine,
         scope = viewModelScope,
         levelFor = ::fixedLevel,
+        saver = GameStorage.saver(application),
     )
 
     init {
         controller.start()
+        controller.checkForSavedGame()
     }
 
     override fun onCleared() {
