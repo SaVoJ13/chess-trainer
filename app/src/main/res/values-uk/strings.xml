@@ -2,5 +2,72 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <resources>
     <string name="app_name">Шаховий тренер</string>
-    <string name="main_placeholder">Шаховий тренер у розробці</string>
+
+    <!-- Екран гри: стан -->
+    <string name="game_status_your_turn">Ваш хід</string>
+    <string name="game_status_engine_turn">Хід рушія</string>
+    <string name="game_status_engine_thinking">Рушій думає…</string>
+    <string name="game_status_engine_starting">Запуск рушія…</string>
+    <string name="game_status_check">Шах!</string>
+
+    <!-- Екран гри: результати -->
+    <string name="game_result_checkmate_win">Мат. Ви перемогли!</string>
+    <string name="game_result_checkmate_loss">Мат. Ви програли.</string>
+    <string name="game_result_stalemate">Нічия: пат</string>
+    <string name="game_result_insufficient_material">Нічия: жоден бік не може поставити мат</string>
+    <string name="game_result_draw_claimed">Нічию зафіксовано за вашою вимогою</string>
+    <string name="game_result_fivefold_repetition">Нічия: позиція повторилася п\'ять разів</string>
+    <string name="game_result_seventy_five_moves">Нічия: 75 ходів без взяття й ходу пішака</string>
+    <string name="game_result_resigned">Ви здалися</string>
+
+    <!-- Екран гри: смуга вимоги нічиєї -->
+    <string name="game_claim_threefold_repetition">Позиція повторилася тричі.</string>
+    <string name="game_claim_fifty_moves">50 ходів без взяття й ходу пішака.</string>
+    <string name="game_action_claim_draw">Вимагати нічию</string>
+    <string name="game_action_continue">Продовжити</string>
+
+    <!-- Екран гри: дії -->
+    <string name="game_action_undo">Скасувати хід</string>
+    <string name="game_action_resign">Здатися</string>
+    <string name="game_action_new_game">Нова партія</string>
+    <string name="game_action_flip">Перевернути дошку</string>
+    <string name="game_action_retry">Спробувати знову</string>
+    <string name="common_cancel">Скасувати</string>
+
+    <!-- Екран гри: проблеми рушія -->
+    <string name="game_engine_unavailable">Не вдалося запустити шаховий рушій або він перестав відповідати. Вашу партію збережено.</string>
+    <string name="game_engine_crashed">Шаховий рушій несподівано зупинився. Вашу партію збережено.</string>
+    <string name="game_engine_unexpected">Шаховий рушій не повернув придатного ходу. Вашу партію збережено.</string>
+
+    <!-- Екран гри: діалоги -->
+    <string name="game_dialog_resign_title">Здатися?</string>
+    <string name="game_dialog_resign_text">Партію буде завершено поразкою.</string>
+    <string name="game_dialog_new_game_title">Почати нову партію?</string>
+    <string name="game_dialog_new_game_in_progress">Поточну партію буде втрачено.</string>
+    <string name="game_dialog_play_white">Грати білими</string>
+    <string name="game_dialog_play_black">Грати чорними</string>
+    <string name="game_promotion_title">Перетворити пішака на</string>
+
+    <!-- Екран гри: доступність -->
+    <string name="game_cd_board">Шахова дошка</string>
+    <string name="game_cd_moves">Ходи</string>
+    <string name="game_cd_square_piece">%1$s, %2$s</string>
+    <string name="game_cd_square_empty">%1$s, порожньо</string>
+    <string name="game_cd_square_selected">%1$s, вибрано</string>
+    <string name="game_cd_square_target">%1$s, можливий хід</string>
+    <string name="game_cd_square_last_move">%1$s, останній хід</string>
+
+    <!-- Фігури -->
+    <string name="piece_white_king">Білий король</string>
+    <string name="piece_white_queen">Білий ферзь</string>
+    <string name="piece_white_rook">Біла тура</string>
+    <string name="piece_white_bishop">Білий слон</string>
+    <string name="piece_white_knight">Білий кінь</string>
+    <string name="piece_white_pawn">Білий пішак</string>
+    <string name="piece_black_king">Чорний король</string>
+    <string name="piece_black_queen">Чорний ферзь</string>
+    <string name="piece_black_rook">Чорна тура</string>
+    <string name="piece_black_bishop">Чорний слон</string>
+    <string name="piece_black_knight">Чорний кінь</string>
+    <string name="piece_black_pawn">Чорний пішак</string>
 </resources>
