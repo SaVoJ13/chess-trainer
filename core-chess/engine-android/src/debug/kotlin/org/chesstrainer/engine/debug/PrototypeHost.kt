@@ -20,9 +20,9 @@ internal object PrototypeHost {
     private val scenarios = AtomicReference<Pair<String, PrototypeScenarios>?>(null)
     private val running = AtomicReference<String?>(null)
 
-    fun launch(context: Context, name: String, remote: Boolean, baseline: Boolean, repeat: Int, onDone: () -> Unit) {
+    fun launch(context: Context, name: String, remote: Boolean, baseline: Boolean, repeat: Int, noWait: Boolean = false, onDone: () -> Unit) {
         val mode = if (remote) "remote" else "inproc"
-        val key = "$mode/$baseline"
+        val key = "$mode/$baseline/$noWait"
         val request = "$name/$key/$repeat"
         if (!running.compareAndSet(null, request)) {
             Log.i("EnginePrototype", "ignored $request: ${running.get()} is still running")
@@ -30,7 +30,7 @@ internal object PrototypeHost {
         }
         // Той самий екземпляр рушія живе між сценаріями одного режиму (потрібно для bgprep → bgcheck).
         val current = scenarios.get()?.takeIf { it.first == key }?.second
-            ?: PrototypeScenarios(context.applicationContext, mode, baseline).also { scenarios.set(key to it) }
+            ?: PrototypeScenarios(context.applicationContext, mode, baseline, noWait).also { scenarios.set(key to it) }
         scope.launch {
             val watchdog = startWatchdog(request)
             try {

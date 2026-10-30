@@ -36,6 +36,7 @@ class PrototypeScenarios(
     private val context: Context,
     private val mode: String,        // "inproc" | "remote"
     private val forceBaseline: Boolean,
+    private val noWait: Boolean = false,   // налагодження G1: не чекати смерті старого :engine
 ) {
     private val rules = ChesslibRules()
     private val startFen = Fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
@@ -81,6 +82,13 @@ class PrototypeScenarios(
                 "bgprep" -> prepareBackground()
                 "bgcheck" -> backgroundCheck()
                 "stop" -> engine.stop()
+                "stream" -> MeasureScenarios(context, mode, forceBaseline).stream(repeat)
+                "memstop" -> MeasureScenarios(context, mode, forceBaseline).memoryAfterStop(repeat)
+                "hang" -> WatchdogScenarios(context, mode, forceBaseline).hang()
+                "soak", "soaklong" -> {
+                    org.chesstrainer.engine.RemoteTransport.awaitOldProcessDeath = !noWait
+                    WatchdogScenarios(context, mode, forceBaseline).soak(repeat, scenario == "soaklong")
+                }
                 else -> log("unknown scenario $scenario")
             }
         } catch (t: Throwable) {
