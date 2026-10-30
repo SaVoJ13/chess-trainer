@@ -3,6 +3,11 @@
 #
 # CI за CONTRACTS 7.1. Фільтра `paths` немає навмисно: статус цього workflow
 # може бути обов'язковим (Required) для `main`.
+#
+# Кожен job явно встановлює Android SDK Platform 37, NDK і CMake через sdkmanager
+# (SW-017), щоб збірка не залежала від складу образу раннера. Ліцензії SDK на
+# раннері прийнято в образі. Мережу NNUE (98 МБ, SW-008) кешує actions/cache:
+# завдання `fetchNnue*` перевіряє SHA-256 і при хибному кеші завантажує файл знову.
 name: CI
 
 on:
@@ -26,9 +31,18 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Install Android SDK components
+        run: >
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install
+          "platforms;android-37.0" "ndk;30.0.16248370" "cmake;4.1.2"
+      - name: Verify android.jar integrity
+        run: unzip -tq "$ANDROID_HOME/platforms/android-37.0/android.jar"
+      - uses: actions/cache@v6
+        with:
+          path: .nnue-cache
+          key: nnue-${{ hashFiles('core-chess/engine-android/build.gradle.kts') }}
       - uses: gradle/actions/setup-gradle@v6
-      # Збірка, unit-тести всіх модулів. Швидкий perft (тег JUnit `perft`)
-      # додасть Шахове ядро, коли з'являться тести (CONTRACTS 7.1).
+      # Збірка, unit-тести всіх модулів, швидкий perft (CONTRACTS 7.1).
       - run: ./gradlew build
 
   # Debug-APK для прототипу на телефоні (запит Архітектора). Без фільтра paths.
@@ -41,6 +55,16 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Install Android SDK components
+        run: >
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install
+          "platforms;android-37.0" "ndk;30.0.16248370" "cmake;4.1.2"
+      - name: Verify android.jar integrity
+        run: unzip -tq "$ANDROID_HOME/platforms/android-37.0/android.jar"
+      - uses: actions/cache@v6
+        with:
+          path: .nnue-cache
+          key: nnue-${{ hashFiles('core-chess/engine-android/build.gradle.kts') }}
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew :app:assembleDebug
       - uses: actions/upload-artifact@v7
@@ -59,6 +83,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Install Android SDK components
+        run: >
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install
+          "platforms;android-37.0" "ndk;30.0.16248370" "cmake;4.1.2"
+      - name: Verify android.jar integrity
+        run: unzip -tq "$ANDROID_HOME/platforms/android-37.0/android.jar"
       - uses: gradle/actions/setup-gradle@v6
       # Глибокий perft: JUnit Category PerftDeep (CONTRACTS 7.1).
       - run: ./gradlew :core-chess:api:perftDeep
