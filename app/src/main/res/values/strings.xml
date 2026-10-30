@@ -2,5 +2,72 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <resources>
     <string name="app_name">Chess Trainer</string>
-    <string name="main_placeholder">Chess Trainer is under construction</string>
+
+    <!-- Game screen: status -->
+    <string name="game_status_your_turn">Your move</string>
+    <string name="game_status_engine_turn">Engine\'s move</string>
+    <string name="game_status_engine_thinking">Engine is thinking…</string>
+    <string name="game_status_engine_starting">Starting the engine…</string>
+    <string name="game_status_check">Check!</string>
+
+    <!-- Game screen: results -->
+    <string name="game_result_checkmate_win">Checkmate. You won!</string>
+    <string name="game_result_checkmate_loss">Checkmate. You lost.</string>
+    <string name="game_result_stalemate">Draw by stalemate</string>
+    <string name="game_result_insufficient_material">Draw: neither side can deliver checkmate</string>
+    <string name="game_result_draw_claimed">Draw claimed</string>
+    <string name="game_result_fivefold_repetition">Draw: the position occurred five times</string>
+    <string name="game_result_seventy_five_moves">Draw: 75 moves without a capture or a pawn move</string>
+    <string name="game_result_resigned">You resigned</string>
+
+    <!-- Game screen: draw claim bar -->
+    <string name="game_claim_threefold_repetition">The position has occurred three times.</string>
+    <string name="game_claim_fifty_moves">50 moves without a capture or a pawn move.</string>
+    <string name="game_action_claim_draw">Claim draw</string>
+    <string name="game_action_continue">Continue</string>
+
+    <!-- Game screen: actions -->
+    <string name="game_action_undo">Undo move</string>
+    <string name="game_action_resign">Resign</string>
+    <string name="game_action_new_game">New game</string>
+    <string name="game_action_flip">Flip board</string>
+    <string name="game_action_retry">Try again</string>
+    <string name="common_cancel">Cancel</string>
+
+    <!-- Game screen: engine problems -->
+    <string name="game_engine_unavailable">The chess engine could not be started or stopped responding. Your game is safe.</string>
+    <string name="game_engine_crashed">The chess engine stopped unexpectedly. Your game is safe.</string>
+    <string name="game_engine_unexpected">The chess engine did not return a usable move. Your game is safe.</string>
+
+    <!-- Game screen: dialogs -->
+    <string name="game_dialog_resign_title">Resign the game?</string>
+    <string name="game_dialog_resign_text">The game will end with a loss.</string>
+    <string name="game_dialog_new_game_title">Start a new game?</string>
+    <string name="game_dialog_new_game_in_progress">The current game will be lost.</string>
+    <string name="game_dialog_play_white">Play as White</string>
+    <string name="game_dialog_play_black">Play as Black</string>
+    <string name="game_promotion_title">Promote the pawn to</string>
+
+    <!-- Game screen: accessibility -->
+    <string name="game_cd_board">Chessboard</string>
+    <string name="game_cd_moves">Moves</string>
+    <string name="game_cd_square_piece">%1$s, %2$s</string>
+    <string name="game_cd_square_empty">%1$s, empty</string>
+    <string name="game_cd_square_selected">%1$s, selected</string>
+    <string name="game_cd_square_target">%1$s, possible move</string>
+    <string name="game_cd_square_last_move">%1$s, last move</string>
+
+    <!-- Pieces -->
+    <string name="piece_white_king">White king</string>
+    <string name="piece_white_queen">White queen</string>
+    <string name="piece_white_rook">White rook</string>
+    <string name="piece_white_bishop">White bishop</string>
+    <string name="piece_white_knight">White knight</string>
+    <string name="piece_white_pawn">White pawn</string>
+    <string name="piece_black_king">Black king</string>
+    <string name="piece_black_queen">Black queen</string>
+    <string name="piece_black_rook">Black rook</string>
+    <string name="piece_black_bishop">Black bishop</string>
+    <string name="piece_black_knight">Black knight</string>
+    <string name="piece_black_pawn">Black pawn</string>
 </resources>
