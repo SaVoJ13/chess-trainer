@@ -85,7 +85,7 @@ class PrototypeActivity : Activity() {
     private companion object {
         val SCENARIOS = listOf(
             "hello", "contract", "cold", "restart", "bestmove", "ipc", "analyse",
-            "memory", "crash", "bgprep", "bgcheck", "stop", "hang", "soak", "soaklong", "stream", "memstop",
+            "memory", "crash", "bgprep", "bgcheck", "stop", "hang", "soak", "soaklong", "stream", "memstop", "dotcmp", "nnuefifo",
         )
     }
 }

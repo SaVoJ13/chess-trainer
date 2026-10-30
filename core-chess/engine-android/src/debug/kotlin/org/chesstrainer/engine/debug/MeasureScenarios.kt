@@ -96,6 +96,62 @@ class MeasureScenarios(private val context: Context, private val mode: String, p
         log("MEM_END")
     }
 
+
+    private fun batteryTempC(): Double {
+        val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        return (intent?.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0) / 10.0
+    }
+
+    /**
+     * Чистий порівняльний вимір `armv8` проти `armv8-dotprod` (одна серія, чергування порядку ABBA…).
+     * Бібліотеку вибирає процес, тому кожне випробування це новий `:engine` (режим remote) з потрібним прапорцем.
+     * Робота фіксована: один потік, `Hash 16`, `go nodes N`; пошук детермінований, тож порівнюється час і nps.
+     */
+    suspend fun dotprodCompare(pairs: Int, nodes: Long = 4_000_000, pauseMs: Long = 10_000) {
+        val dot = ArrayList<Double>()
+        val base = ArrayList<Double>()
+        val dotNps = ArrayList<Long>()
+        val baseNps = ArrayList<Long>()
+        repeat(pairs) { pair ->
+            val order = if (pair % 2 == 0) listOf(false, true) else listOf(true, false)   // true = baseline armv8
+            for (baseline in order) {
+                val engine = UciEngineService(RemoteTransport(context, baseline), rules)
+                val temp = batteryTempC()
+                if (engine.start(EngineConfig(1, 16)) !is ChessResult.Ok) {
+                    log("start failed")
+                    return
+                }
+                var lastNps = 0L
+                var lastNodes = 0L
+                val t = SystemClock.elapsedRealtimeNanos()
+                engine.analyse(AnalysisRequest(middlegame, emptyList(), SearchLimit(nodes = nodes), 1)).collect {
+                    if (it is AnalysisEvent.Update) {
+                        lastNps = it.update.nps
+                        lastNodes = it.update.nodes
+                    }
+                }
+                val seconds = (SystemClock.elapsedRealtimeNanos() - t) / 1e9
+                engine.stop()
+                (if (baseline) base else dot) += seconds
+                (if (baseline) baseNps else dotNps) += lastNps
+                result(
+                    "dotcmp", "pair" to pair, "lib" to (if (baseline) "armv8" else "armv8_dotprod"),
+                    "wall_s" to "%.2f".format(seconds), "nodes" to lastNodes, "nps_last" to lastNps, "battery_c" to temp,
+                )
+                delay(pauseMs)
+            }
+        }
+        fun med(v: List<Double>) = v.sorted()[v.size / 2]
+        fun medL(v: List<Long>) = v.sorted()[v.size / 2]
+        result(
+            "dotcmp-summary", "pairs" to pairs, "nodes" to nodes,
+            "dotprod_wall_median_s" to "%.2f".format(med(dot)), "dotprod_wall_max_s" to "%.2f".format(dot.max()),
+            "armv8_wall_median_s" to "%.2f".format(med(base)), "armv8_wall_max_s" to "%.2f".format(base.max()),
+            "dotprod_nps_median" to medL(dotNps), "armv8_nps_median" to medL(baseNps),
+            "speedup_by_median_wall" to "%.3f".format(med(base) / med(dot)),
+        )
+    }
+
     private companion object {
         const val TAG = "EnginePrototype"
         const val SETTLE_MS = 6_000L

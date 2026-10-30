@@ -82,6 +82,8 @@ class PrototypeScenarios(
                 "bgprep" -> prepareBackground()
                 "bgcheck" -> backgroundCheck()
                 "stop" -> engine.stop()
+                "nnuefifo" -> NnueResearch(context).fifo()
+                "dotcmp" -> MeasureScenarios(context, mode, forceBaseline).dotprodCompare(repeat)
                 "stream" -> MeasureScenarios(context, mode, forceBaseline).stream(repeat)
                 "memstop" -> MeasureScenarios(context, mode, forceBaseline).memoryAfterStop(repeat)
                 "hang" -> WatchdogScenarios(context, mode, forceBaseline).hang()
