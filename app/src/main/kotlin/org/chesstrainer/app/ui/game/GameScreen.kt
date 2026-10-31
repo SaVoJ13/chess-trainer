@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -29,6 +33,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -60,7 +67,11 @@ import org.chesstrainer.app.game.EngineStatus
 import org.chesstrainer.app.game.GameController
 import org.chesstrainer.app.game.GameOutcome
 import org.chesstrainer.app.game.GameUiState
+import org.chesstrainer.app.game.displayedApproxElo
+import org.chesstrainer.app.game.groupedByGroup
 import org.chesstrainer.app.ui.theme.BoardColors
+import org.chesstrainer.core.engine.DifficultyId
+import org.chesstrainer.core.engine.DifficultyLevel
 import org.chesstrainer.core.game.AutoDrawReason
 import org.chesstrainer.core.game.ClaimReason
 import org.chesstrainer.core.model.Color as ChessColor
@@ -115,7 +126,9 @@ fun GameScreen(controller: GameController) {
         )
         GameDialog.NEW_GAME -> NewGameDialog(
             inProgress = !state.isOver && state.game.moves.isNotEmpty(),
-            onChoose = { color -> dialog = GameDialog.NONE; controller.newGame(color) },
+            levels = state.levels,
+            suggested = remember(state.levels) { controller.suggestedDifficulty() },
+            onChoose = { color, level -> dialog = GameDialog.NONE; controller.newGame(color, level) },
             onDismiss = { dialog = GameDialog.NONE },
         )
     }
@@ -157,6 +170,11 @@ private fun StatusLine(state: GameUiState, modifier: Modifier = Modifier) {
             text = text,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = if (outcome != null) FontWeight.Bold else FontWeight.Medium,
+        )
+        Text(
+            text = stringResource(R.string.game_level_label, difficultyName(state.difficultyId)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (state.engine is EngineStatus.Starting) {
             Text(
@@ -208,6 +226,33 @@ private fun Notices(state: GameUiState, controller: GameController) {
                 )
                 Button(onClick = controller::retryEngine, modifier = Modifier.heightIn(min = MinTouch)) {
                     Text(stringResource(R.string.game_action_retry))
+                }
+            }
+        }
+    }
+
+    state.levelNotice?.let { notice ->
+        Surface(
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
+            Row(
+                Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(
+                        R.string.game_level_unavailable,
+                        difficultyName(notice.requested),
+                        difficultyName(notice.used),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = controller::dismissLevelNotice, modifier = Modifier.heightIn(min = MinTouch)) {
+                    Text(stringResource(R.string.game_level_unavailable_ok))
                 }
             }
         }
@@ -327,19 +372,46 @@ private fun ResignDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun NewGameDialog(inProgress: Boolean, onChoose: (ChessColor) -> Unit, onDismiss: () -> Unit) {
+private fun NewGameDialog(
+    inProgress: Boolean,
+    levels: List<DifficultyLevel>?,
+    suggested: DifficultyId,
+    onChoose: (ChessColor, DifficultyId) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selected by rememberSaveable { mutableIntStateOf(suggested.value) }
+    // Збережений вибір міг не потрапити в поточний список: тоді береться запропонований рівень.
+    val current = levels?.firstOrNull { it.id.value == selected }?.id ?: suggested
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.game_dialog_new_game_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (inProgress) Text(stringResource(R.string.game_dialog_new_game_in_progress))
+                Text(
+                    stringResource(R.string.game_dialog_level_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.semantics { heading() },
+                )
+                if (levels == null) {
+                    Text(
+                        stringResource(R.string.game_dialog_level_loading, difficultyName(current)),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    LevelList(
+                        levels = levels,
+                        selected = current,
+                        onSelect = { selected = it.value },
+                        modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    )
+                }
                 Button(
-                    onClick = { onChoose(ChessColor.WHITE) },
+                    onClick = { onChoose(ChessColor.WHITE, current) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch),
                 ) { Text(stringResource(R.string.game_dialog_play_white)) }
                 Button(
-                    onClick = { onChoose(ChessColor.BLACK) },
+                    onClick = { onChoose(ChessColor.BLACK, current) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch),
                 ) { Text(stringResource(R.string.game_dialog_play_black)) }
             }
@@ -351,6 +423,47 @@ private fun NewGameDialog(inProgress: Boolean, onChoose: (ChessColor) -> Unit, o
             }
         },
     )
+}
+
+/** Рівні за групами `DifficultyGroup` у порядку від слабшого; число «≈ N» лише для рівнів `UCI_Elo`. */
+@Composable
+private fun LevelList(
+    levels: List<DifficultyLevel>,
+    selected: DifficultyId,
+    onSelect: (DifficultyId) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.selectableGroup()) {
+        levels.groupedByGroup().forEach { (group, items) ->
+            Text(
+                stringResource(difficultyGroupRes(group)),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp).semantics { heading() },
+            )
+            items.forEach { level ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = MinTouch)
+                        .selectable(selected = level.id == selected, role = Role.RadioButton, onClick = { onSelect(level.id) }),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RadioButton(selected = level.id == selected, onClick = null)
+                    Text(difficultyName(level.id), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    val approx = level.displayedApproxElo()
+                    if (approx != null) {
+                        Text(
+                            stringResource(R.string.difficulty_approx_elo, approx),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

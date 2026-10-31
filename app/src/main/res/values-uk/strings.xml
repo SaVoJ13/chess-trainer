@@ -52,6 +52,35 @@
     <string name="game_resume_continue">Продовжити</string>
     <string name="game_resume_new_game">Нова партія</string>
 
+    <!-- Рівні складності (CONTRACTS 3.5: difficulty_<id>) -->
+    <string name="difficulty_group_beginner">Початківець</string>
+    <string name="difficulty_group_amateur">Аматор</string>
+    <string name="difficulty_group_club">Клубний гравець</string>
+    <string name="difficulty_group_strong">Сильний</string>
+    <string name="difficulty_group_max">Максимум</string>
+    <string name="difficulty_1">Початківець 1</string>
+    <string name="difficulty_2">Початківець 2</string>
+    <string name="difficulty_3">Початківець 3</string>
+    <string name="difficulty_4">Початківець 4</string>
+    <string name="difficulty_5">Початківець 5</string>
+    <string name="difficulty_10">Аматор 1</string>
+    <string name="difficulty_11">Аматор 2</string>
+    <string name="difficulty_12">Аматор 3</string>
+    <string name="difficulty_20">Клуб 1</string>
+    <string name="difficulty_21">Клуб 2</string>
+    <string name="difficulty_30">Сильний 1</string>
+    <string name="difficulty_31">Сильний 2</string>
+    <string name="difficulty_99">Максимум</string>
+    <string name="difficulty_unknown">Рівень %1$d</string>
+    <string name="difficulty_approx_elo">≈ %1$d</string>
+
+    <!-- Екран гри: рівень складності -->
+    <string name="game_level_label">Рівень: %1$s</string>
+    <string name="game_dialog_level_title">Рівень</string>
+    <string name="game_dialog_level_loading">Рушій запускається, список рівнів з\'явиться за мить. Рівень: %1$s.</string>
+    <string name="game_level_unavailable">Рівня «%1$s» немає на цьому пристрої. Грає рівень «%2$s».</string>
+    <string name="game_level_unavailable_ok">Гаразд</string>
+
     <!-- Екран гри: доступність -->
     <string name="game_cd_board">Шахова дошка</string>
     <string name="game_cd_moves">Ходи</string>
