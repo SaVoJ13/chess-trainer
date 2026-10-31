@@ -17,10 +17,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.chesstrainer.app.settings.DifficultyPreferences
 import org.chesstrainer.app.storage.GameSaver
 import org.chesstrainer.app.storage.ResumableGame
+import org.chesstrainer.core.engine.DefaultDifficultyPresets
+import org.chesstrainer.core.engine.DifficultyId
 import org.chesstrainer.core.engine.DifficultyLevel
-import org.chesstrainer.core.engine.EngineCapabilities
+import org.chesstrainer.core.engine.DifficultyPresets
 import org.chesstrainer.core.engine.EngineConfig
 import org.chesstrainer.core.engine.EngineService
 import org.chesstrainer.core.engine.MoveRequest
@@ -49,12 +52,14 @@ class GameController(
     private val games: ChessGameFactory,
     private val engine: EngineService,
     private val scope: CoroutineScope,
-    private val levelFor: (EngineCapabilities?) -> DifficultyLevel,
+    presets: DifficultyPresets = DefaultDifficultyPresets(),
+    private val preferences: DifficultyPreferences = DifficultyPreferences.None,
     private val engineConfig: EngineConfig = EngineConfig(),
     private val saver: GameSaver = GameSaver.None,
     playerColor: Color = Color.WHITE,
 ) {
-    private val _state = MutableStateFlow(newState(playerColor))
+    private val resolver = DifficultyResolver(presets)
+    private val _state = MutableStateFlow(newState(playerColor, DifficultyDefaults.initial(preferences.lastUsed())))
     val state: StateFlow<GameUiState> = _state.asStateFlow()
 
     /** Збільшується, коли поточний пошук стає неактуальним (скасування, нова партія, пауза). */
@@ -70,9 +75,14 @@ class GameController(
     /** Збережена партія, яку запропоновано продовжити (UI бачить лише [GameUiState.resumeOfferPlies]). */
     private var resumeOffer: ResumableGame? = null
 
-    private fun newState(color: Color): GameUiState {
+    private fun newState(color: Color, difficulty: DifficultyId): GameUiState {
         val game = games.new()
-        return GameUiState(game = game, playerColor = color, checkSquare = checkSquareOf(game.position))
+        return GameUiState(
+            game = game,
+            playerColor = color,
+            checkSquare = checkSquareOf(game.position),
+            difficultyId = difficulty,
+        )
     }
 
     // --- життєвий цикл (CONTRACTS 3.4) ---
@@ -228,14 +238,27 @@ class GameController(
         _state.update { it.copy(flipped = !it.flipped) }
     }
 
-    /** Нова партія; рушій лишається запущеним, між партіями діє `newGame()` (CONTRACTS 3.4). */
-    fun newGame(playerColor: Color) {
+    /** Рівень, який діалог «Нова партія» обирає попередньо: останній використаний, на цьому рушії доступний. */
+    fun suggestedDifficulty(): DifficultyId {
+        val wanted = DifficultyDefaults.initial(preferences.lastUsed())
+        val capabilities = engine.capabilities ?: return wanted
+        return resolver.resolve(wanted, capabilities).level.id
+    }
+
+    /**
+     * Нова партія; рушій лишається запущеним, між партіями діє `newGame()` (CONTRACTS 3.4).
+     * [difficulty] запам'ятовується як останній використаний; якщо його немає на пристрої, партія йде на
+     * найближчому доступному, а [GameUiState.levelNotice] про це повідомляє.
+     */
+    fun newGame(playerColor: Color, difficulty: DifficultyId = suggestedDifficulty()) {
         if (state.value.awaitingResume) return
         invalidateSearch()
         saver.abandonActive()
-        val fresh = newState(playerColor)
+        preferences.rememberUsed(difficulty)
+        val fresh = newState(playerColor, difficulty)
         val keepProblem = state.value.engine as? EngineStatus.Problem
-        _state.value = fresh.copy(engine = keepProblem ?: EngineStatus.Starting)
+        _state.value = fresh.copy(engine = keepProblem ?: EngineStatus.Starting, levels = state.value.levels)
+        resolveLevel()
         pendingNewGame = true
         if (keepProblem == null) warmUp()
         if (keepProblem == null && fresh.engineToMove) requestEngineMove()
@@ -274,11 +297,35 @@ class GameController(
         }
     }
 
+    /**
+     * Підбирає рівень партії за можливостями рушія (їх відомо лише після першого `start()`), оновлює
+     * [GameUiState.levels] і, якщо запитаного рівня на пристрої немає, [GameUiState.difficultyId] та
+     * [GameUiState.levelNotice]. `null`, поки можливості невідомі.
+     */
+    private fun resolveLevel(): DifficultyLevel? {
+        val capabilities = engine.capabilities ?: return null
+        val resolved = resolver.resolve(state.value.difficultyId, capabilities)
+        val levels = resolver.levels(capabilities)
+        var changed = false
+        _state.update {
+            val notice = if (resolved.substituted) LevelNotice(it.difficultyId, resolved.level.id) else it.levelNotice
+            changed = resolved.level.id != it.difficultyId
+            it.copy(levels = levels, difficultyId = resolved.level.id, levelNotice = notice)
+        }
+        if (changed) persist()
+        return resolved.level
+    }
+
+    fun dismissLevelNotice() {
+        _state.update { it.copy(levelNotice = null) }
+    }
+
     private fun warmUp() {
         warmJob?.cancel()
         _state.update { if (it.engine is EngineStatus.Thinking) it else it.copy(engine = EngineStatus.Starting) }
         warmJob = scope.launch {
             val result = ensureEngine()
+            if (result is ChessResult.Ok) resolveLevel()
             _state.update { s ->
                 when {
                     s.engine !is EngineStatus.Starting -> s
@@ -302,7 +349,7 @@ class GameController(
         if (gen != generation) return
         if (started is ChessResult.Err) return fail(problemOf(started.error))
 
-        val level = levelFor(engine.capabilities)
+        val level = resolveLevel() ?: return fail(EngineProblem.UNEXPECTED)
         val mark = TimeSource.Monotonic.markNow()
         val request = MoveRequest(game.startPosition.fen, game.moves.map { it.uci }, level)
         val result = engine.bestMove(request)
@@ -399,6 +446,8 @@ class GameController(
             it.copy(
                 game = offer.game,
                 playerColor = offer.playerColor,
+                difficultyId = offer.difficultyId,
+                levelNotice = null,
                 flipped = false,
                 selected = null,
                 targets = emptySet(),
@@ -410,6 +459,7 @@ class GameController(
                 checkSquare = checkSquareOf(offer.game.position),
             )
         }
+        resolveLevel()
         if (!paused && state.value.engineToMove) requestEngineMove()
     }
 

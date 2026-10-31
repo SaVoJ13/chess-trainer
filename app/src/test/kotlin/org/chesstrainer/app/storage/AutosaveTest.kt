@@ -17,7 +17,12 @@ import org.chesstrainer.app.game.GameController
 import org.chesstrainer.app.game.GameOutcome
 import org.chesstrainer.app.game.GameTermination
 import org.chesstrainer.app.game.GameUiState
-import org.chesstrainer.app.game.fixedLevel
+import org.chesstrainer.app.game.DifficultyDefaults
+import org.chesstrainer.app.game.MemoryPreferences
+import org.chesstrainer.app.game.ZeroDelayPresets
+import org.chesstrainer.core.engine.DifficultyId
+import org.chesstrainer.core.engine.DifficultyIds
+import org.chesstrainer.core.engine.EngineCapabilities
 import org.chesstrainer.core.engine.FakeEngineService
 import org.chesstrainer.core.game.ChessGame
 import org.chesstrainer.core.game.ChessGameFactory
@@ -84,9 +89,11 @@ class AutosaveTest {
         fen: String? = null,
         color: Color = Color.WHITE,
         clockStart: Long = 1_000,
+        val preferences: MemoryPreferences = MemoryPreferences(),
+        capabilities: EngineCapabilities = FakeEngineService.DEFAULT_CAPABILITIES,
     ) {
         val rules = ChesslibRules()
-        val fake = FakeEngineService(rules)
+        val fake = FakeEngineService(rules, capabilities)
         val errors = mutableListOf<Throwable>()
         private var tick = clockStart
         val persistence = GamePersistence(DefaultChessGameFactory(rules), DefaultPgnCodec(rules))
@@ -96,7 +103,8 @@ class AutosaveTest {
             games = factoryFor(fen),
             engine = fake,
             scope = scope,
-            levelFor = { caps -> fixedLevel(caps).copy(minReplyDelayMs = 0) },
+            presets = ZeroDelayPresets(),
+            preferences = preferences,
             saver = saver,
             playerColor = color,
         )
@@ -174,7 +182,7 @@ class AutosaveTest {
         assertNull(row.termination)
         assertEquals(GameMode.VS_ENGINE, row.mode)
         assertEquals(Color.WHITE, row.playerColor)
-        assertNull("difficultyId не записується до появи пресетів", row.difficultyId)
+        assertEquals("рівень партії записується", DifficultyIds.ELO_MIN, row.difficultyId)
         assertTrue(row.updatedAt > row.createdAt)
         assertTrue(s.errors.isEmpty())
     }
@@ -546,18 +554,84 @@ class AutosaveTest {
             val move = rules.legalMoves(game.position).minByOrNull { rules.toUci(it).value }!!
             game = (game.play(move) as ChessResult.Ok).value
         }
-        val state = GameUiState(game = game, playerColor = Color.BLACK, endedBy = GameOutcome.DrawClaimed)
+        val state = GameUiState(game = game, playerColor = Color.BLACK, endedBy = GameOutcome.DrawClaimed, difficultyId = DifficultyId(21))
 
         val saved = persistence.encode(state, id = null, createdAt = Instant.ofEpochSecond(0), updatedAt = Instant.ofEpochSecond(1))
         assertTrue(saved.finished)
         assertEquals(GameTermination.DRAW_CLAIMED, saved.termination)
         assertEquals(Color.BLACK, saved.playerColor)
-        assertNull(saved.difficultyId)
+        assertEquals(DifficultyId(21), saved.difficultyId)
         assertTrue(saved.pgn.contains("[Date \"1970.01.01\"]"))
 
         val restored = persistence.decode(saved)!!
         assertEquals(game.startPosition.fen, restored.startPosition.fen)
         assertEquals(game.moves.map { it.uci }, restored.moves.map { it.uci })
         assertEquals(game.position.fen, restored.position.fen)
+    }
+
+    // --- рівень складності (CONTRACTS 5, v0.12) ---
+
+    @Test
+    fun levelOfTheNewGameIsSavedAndRestored() = scenario { scope ->
+        val repo = MemoryRepository()
+        val first = Session(repo, scope, preferences = MemoryPreferences(DifficultyIds.ELO_MIN))
+        first.controller.start()
+        first.controller.newGame(Color.WHITE, DifficultyIds.ELO_1900)
+        first.playRound("e2", "e4")
+        first.flush()
+        assertEquals(DifficultyIds.ELO_1900, repo.rows.values.single().difficultyId)
+
+        // Новий запуск: у налаштуваннях інший рівень, але продовжена партія повертає свій.
+        val s = Session(repo, scope, clockStart = 5_000, preferences = MemoryPreferences(DifficultyIds.HANDICAP_1))
+        s.controller.start()
+        s.controller.checkForSavedGame()
+        s.await { it.resumeOfferPlies != null }
+        s.controller.continueSavedGame()
+        assertEquals(DifficultyIds.ELO_1900, s.state.difficultyId)
+        assertNull(s.state.levelNotice)
+        s.humanMove()
+        s.await { it.game.moves.size == 4 && it.engine == EngineStatus.Idle }
+        s.flush()
+        assertEquals(DifficultyIds.ELO_1900, repo.rows.values.single().difficultyId)
+        assertEquals("партія грається на збереженому рівні", DifficultyIds.ELO_1900, s.fake.moveRequests.last().level.id)
+    }
+
+    @Test
+    fun oldGameWithoutLevelIsRestoredWithTheMinimumEloLevel() = scenario { scope ->
+        val repo = MemoryRepository()
+        val first = Session(repo, scope)
+        first.controller.start()
+        first.playRound("e2", "e4")
+        first.flush()
+        val id = repo.rows.keys.single()
+        repo.rows[id] = repo.rows.getValue(id).copy(difficultyId = null) // запис, створений до v0.12
+
+        // Налаштування радять інший рівень, але стара партія завжди йде з DifficultyId(10).
+        val s = Session(repo, scope, clockStart = 5_000, preferences = MemoryPreferences(DifficultyIds.HANDICAP_5))
+        s.controller.start()
+        s.controller.checkForSavedGame()
+        s.await { it.resumeOfferPlies != null }
+        s.controller.continueSavedGame()
+        assertEquals(DifficultyDefaults.LEGACY_GAME, s.state.difficultyId)
+        assertEquals(DifficultyId(10), s.state.difficultyId)
+        s.humanMove()
+        s.await { it.game.moves.size == 4 && it.engine == EngineStatus.Idle }
+        s.flush()
+        assertEquals("запис оновлено з рівнем", DifficultyId(10), repo.rows.getValue(id).difficultyId)
+    }
+
+    @Test
+    fun levelUnavailableOnTheDeviceIsReplacedAndTheReplacementIsSaved() = scenario { scope ->
+        val repo = MemoryRepository()
+        val noMultiPv = FakeEngineService.DEFAULT_CAPABILITIES.copy(maxMultiPv = 1)
+        val s = Session(repo, scope, preferences = MemoryPreferences(DifficultyIds.HANDICAP_3), capabilities = noMultiPv)
+        s.controller.start()
+        val noticed = s.await { it.levelNotice != null }
+        assertEquals(DifficultyIds.HANDICAP_3, noticed.levelNotice!!.requested)
+        assertEquals(DifficultyIds.ELO_MIN, noticed.levelNotice!!.used)
+        assertEquals(DifficultyIds.ELO_MIN, noticed.difficultyId)
+        s.playRound("e2", "e4")
+        s.flush()
+        assertEquals("зберігається рівень, на якому справді грали", DifficultyIds.ELO_MIN, repo.rows.values.single().difficultyId)
     }
 }

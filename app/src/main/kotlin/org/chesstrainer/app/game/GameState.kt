@@ -3,6 +3,8 @@
 
 package org.chesstrainer.app.game
 
+import org.chesstrainer.core.engine.DifficultyId
+import org.chesstrainer.core.engine.DifficultyLevel
 import org.chesstrainer.core.game.AutoDrawReason
 import org.chesstrainer.core.game.ChessGame
 import org.chesstrainer.core.game.ClaimReason
@@ -68,6 +70,9 @@ sealed interface EngineStatus {
 
 data class PendingPromotion(val from: Square, val to: Square)
 
+/** Запитаний рівень недоступний на цьому пристрої, замість нього використано [used] (CONTRACTS 5, v0.12). */
+data class LevelNotice(val requested: DifficultyId, val used: DifficultyId)
+
 data class GameUiState(
     val game: ChessGame,
     val playerColor: Color,
@@ -87,6 +92,11 @@ data class GameUiState(
     val resumeOfferPlies: Int? = null,
     /** Король під шахом, якщо є. */
     val checkSquare: Square? = null,
+    /** Рівень складності цієї партії (після можливої заміни на доступний). */
+    val difficultyId: DifficultyId = DifficultyDefaults.FIRST_LAUNCH,
+    /** Рівні, доступні на цьому рушії (від слабшого); `null`, доки рушій не повідомив свої можливості. */
+    val levels: List<DifficultyLevel>? = null,
+    val levelNotice: LevelNotice? = null,
 ) {
     val position get() = game.position
     val lastMove: Move? get() = game.moves.lastOrNull()?.move

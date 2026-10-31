@@ -3,6 +3,9 @@
 
 package org.chesstrainer.app.game
 
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -10,11 +13,17 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
+import org.chesstrainer.app.settings.DifficultyPreferences
+import org.chesstrainer.core.engine.DefaultDifficultyPresets
+import org.chesstrainer.core.engine.DifficultyId
+import org.chesstrainer.core.engine.DifficultyIds
+import org.chesstrainer.core.engine.DifficultyPresets
 import org.chesstrainer.core.engine.EngineConfig
 import org.chesstrainer.core.engine.EngineMove
 import org.chesstrainer.core.engine.EngineService
 import org.chesstrainer.core.engine.EngineState
 import org.chesstrainer.core.engine.FakeEngineService
+import org.chesstrainer.core.engine.HandicapEngineService
 import org.chesstrainer.core.engine.Strength
 import org.chesstrainer.core.game.AutoDrawReason
 import org.chesstrainer.core.game.ChessGameFactory
@@ -84,6 +93,8 @@ class GameControllerTest {
         color: Color = Color.WHITE,
         wrap: (FakeEngineService) -> EngineService = { it },
         autoStart: Boolean = true,
+        presets: DifficultyPresets = ZeroDelayPresets(),
+        preferences: DifficultyPreferences = MemoryPreferences(),
         block: suspend Env.(FakeEngineService) -> Unit,
     ) = runBlocking {
         withTimeout(20_000) {
@@ -96,7 +107,8 @@ class GameControllerTest {
                 games = factoryFor(rules, fen),
                 engine = wrap(fake),
                 scope = scope,
-                levelFor = { caps -> fixedLevel(caps).copy(minReplyDelayMs = 0) },
+                presets = presets,
+                preferences = preferences,
                 playerColor = color,
             )
             val env = Env(rules, fake, controller)
@@ -168,7 +180,7 @@ class GameControllerTest {
         assertEquals(after.game.moves[1].move, after.lastMove)
         assertEquals(1, fake.moveRequests.size)
         assertEquals(listOf(Uci("e2e4")), fake.moveRequests.single().moves)
-        // Поки що фіксований рівень: найслабший UCI_Elo з capabilities (TODO(difficulty) у FixedLevel).
+        // Рівень із налаштувань (за замовчуванням у тестах мінімальний UCI_Elo з capabilities).
         assertEquals(Strength.Elo(FakeEngineService.DEFAULT_CAPABILITIES.eloRange!!.first), fake.moveRequests.single().level.strength)
     }
 
@@ -556,5 +568,107 @@ class GameControllerTest {
         assertEquals(EngineStatus.Thinking, state.engine)
         fake.release()
         await { it.game.moves.size == 2 }
+    }
+
+    // --- рівні складності (CONTRACTS 3.5, 5) ---
+
+    private fun withHandicap(rules: ChesslibRules, fake: FakeEngineService): EngineService =
+        HandicapEngineService(fake, rules, Random(7))
+
+    @Test
+    fun firstLaunchStartsOnDifficulty3() = scenario(preferences = MemoryPreferences(last = null)) {
+        assertEquals(DifficultyId(3), state.difficultyId)
+        assertEquals(DifficultyId(3), controller.suggestedDifficulty())
+    }
+
+    @Test
+    fun lastUsedLevelIsTheDefaultAndNewGameRemembersTheChoice() {
+        val preferences = MemoryPreferences(last = DifficultyIds.ELO_1900)
+        scenario(preferences = preferences) {
+            assertEquals(DifficultyIds.ELO_1900, state.difficultyId)
+            assertEquals(DifficultyIds.ELO_1900, controller.suggestedDifficulty())
+
+            controller.newGame(Color.WHITE, DifficultyIds.ELO_2100)
+            assertEquals(DifficultyIds.ELO_2100, state.difficultyId)
+            assertEquals("вибір запам'ятовується", DifficultyIds.ELO_2100, preferences.last)
+            assertEquals(DifficultyIds.ELO_2100, controller.suggestedDifficulty())
+
+            tap("e2", "e4")
+            await { it.game.moves.size == 2 }
+        }
+    }
+
+    @Test
+    fun levelListAppearsOnceTheEngineReportsItsCapabilities() = scenario {
+        val s = await { it.levels != null }
+        val ids = s.levels!!.map { it.id.value }
+        assertEquals(listOf(1, 2, 3, 4, 5, 10, 11, 12, 20, 21, 30, 31, 99), ids)
+    }
+
+    @Test
+    fun engineIsAskedForTheChosenLevel() = scenario { fake ->
+        controller.newGame(Color.WHITE, DifficultyIds.ELO_2400)
+        tap("e2", "e4")
+        await { it.game.moves.size == 2 }
+        val level = fake.moveRequests.single().level
+        assertEquals(DifficultyIds.ELO_2400, level.id)
+        assertEquals(Strength.Elo(2400), level.strength)
+    }
+
+    @Test
+    fun handicapLevelPlaysThroughTheDecorator() = scenario(
+        wrap = { withHandicap(ChesslibRules(), it) },
+        preferences = MemoryPreferences(last = DifficultyIds.HANDICAP_5),
+    ) { fake ->
+        tap("e2", "e4")
+        val after = await { it.game.moves.size == 2 && it.engine == EngineStatus.Idle }
+        assertEquals(DifficultyIds.HANDICAP_5, after.difficultyId)
+        assertNull(after.levelNotice)
+        assertTrue("Handicap іде через analyse, а не bestMove рушія", fake.moveRequests.isEmpty())
+        assertEquals(1, fake.analysisRequests.size)
+    }
+
+    @Test
+    fun unavailableLevelIsReplacedWithANoticeAndPlayContinues() {
+        val rules = ChesslibRules()
+        val fake = FakeEngineService(rules, FakeEngineService.DEFAULT_CAPABILITIES.copy(maxMultiPv = 1))
+        scenario(wrap = { fake }, preferences = MemoryPreferences(last = DifficultyIds.HANDICAP_3)) {
+            // `fake` у scenario свій; рушій з малим maxMultiPv підставлено через wrap.
+            val noticed = await { it.levelNotice != null }
+            assertEquals(LevelNotice(requested = DifficultyIds.HANDICAP_3, used = DifficultyIds.ELO_MIN), noticed.levelNotice)
+            assertEquals(DifficultyIds.ELO_MIN, noticed.difficultyId)
+
+            controller.dismissLevelNotice()
+            assertNull(state.levelNotice)
+
+            tap("e2", "e4")
+            await { it.game.moves.size == 2 }
+            assertEquals(DifficultyIds.ELO_MIN, fake.moveRequests.single().level.id)
+            assertNull("повідомлення не повертається", state.levelNotice)
+        }
+    }
+
+    @Test
+    fun replyIsShownNoEarlierThanMinReplyDelay() = scenario(presets = FixedDelayPresets(delayMs = 400)) {
+        val mark = TimeSource.Monotonic.markNow()
+        tap("e2", "e4")
+        kotlinx.coroutines.delay(150)
+        assertEquals("рушій ще «думає», хід не показано", 1, state.game.moves.size)
+        assertEquals(EngineStatus.Thinking, state.engine)
+        await { it.game.moves.size == 2 }
+        assertTrue("пауза з рівня виконана: ${mark.elapsedNow()}", mark.elapsedNow() >= 380.milliseconds)
+    }
+
+    @Test
+    fun minReplyDelayAlsoAppliesToHandicapLevels() = scenario(
+        wrap = { withHandicap(ChesslibRules(), it) },
+        presets = DefaultDifficultyPresets(),
+        preferences = MemoryPreferences(last = DifficultyIds.HANDICAP_5),
+    ) {
+        val mark = TimeSource.Monotonic.markNow()
+        tap("e2", "e4")
+        await { it.game.moves.size == 2 }
+        // Пауза Handicap step 5 береться з пресетів (300 мс), а не з коду застосунку.
+        assertTrue("пауза з рівня виконана: ${mark.elapsedNow()}", mark.elapsedNow() >= 280.milliseconds)
     }
 }
