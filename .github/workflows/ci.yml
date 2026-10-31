@@ -44,6 +44,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       # Збірка, unit-тести всіх модулів, швидкий perft (CONTRACTS 7.1).
       - run: ./gradlew build
+      # Звіт ліцензій актуальний (CONTRACTS 7.1, v0.11). Те саме завдання, яким звіт генерують локально:
+      # варіант Release (звіт описує releaseRuntimeClasspath), завдання без суфікса неоднозначне.
+      # Експорт відтворюваний: два запуски дають побайтно однаковий файл, мережа не потрібна (offlineMode).
+      - name: Regenerate license report
+        run: ./gradlew :app:exportLibraryDefinitionsRelease
+      - name: Check that the license report is up to date
+        run: |
+          if ! git diff --exit-code -- app/licenses/aboutlibraries.json; then
+            echo "::error file=app/licenses/aboutlibraries.json::License report is out of date. Run './gradlew :app:exportLibraryDefinitionsRelease' and commit app/licenses/aboutlibraries.json."
+            exit 1
+          fi
 
   # Debug-APK для прототипу на телефоні (запит Архітектора). Без фільтра paths.
   assemble-debug:
@@ -67,6 +78,11 @@ jobs:
           key: nnue-${{ hashFiles('core-chess/engine-android/build.gradle.kts') }}
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew :app:assembleDebug
+      # Статична перевірка байткоду на API вище minSdk 26 (CONTRACTS 7.2). Потрібні JDK 17+, ANDROID_HOME
+      # (platforms/android-*/data/api-versions.xml, build-tools/*/dexdump); без залежностей.
+      # Код виходу 1 (є порушення) або 2 (помилка запуску) валить збірку.
+      - name: Check bytecode compatibility with minSdk
+        run: java scripts/ApiCompatCheck.java --apk app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v7
         with:
           name: app-debug-apk
