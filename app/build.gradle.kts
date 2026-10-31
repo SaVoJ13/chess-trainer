@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.aboutlibraries.android)
+    alias(libs.plugins.ksp)
 }
 
 // SW-006: лише офлайн-режим, без звернень до GitHub API (docs/THIRD_PARTY.md).
@@ -67,7 +68,14 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
     testImplementation(testFixtures(project(":core-chess:api")))
+}
+
+// Room (SW-004): схема експортується з першої версії; кожна зміна схеми має міграцію й тест (CONTRACTS 5).
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

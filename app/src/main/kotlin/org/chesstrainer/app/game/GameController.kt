@@ -4,6 +4,7 @@
 package org.chesstrainer.app.game
 
 import kotlin.time.TimeSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -16,6 +17,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.chesstrainer.app.storage.GameSaver
+import org.chesstrainer.app.storage.ResumableGame
 import org.chesstrainer.core.engine.DifficultyLevel
 import org.chesstrainer.core.engine.EngineCapabilities
 import org.chesstrainer.core.engine.EngineConfig
@@ -48,6 +51,7 @@ class GameController(
     private val scope: CoroutineScope,
     private val levelFor: (EngineCapabilities?) -> DifficultyLevel,
     private val engineConfig: EngineConfig = EngineConfig(),
+    private val saver: GameSaver = GameSaver.None,
     playerColor: Color = Color.WHITE,
 ) {
     private val _state = MutableStateFlow(newState(playerColor))
@@ -62,6 +66,9 @@ class GameController(
 
     private val engineLock = Mutex()
     private var pendingNewGame = false
+
+    /** Збережена партія, яку запропоновано продовжити (UI бачить лише [GameUiState.resumeOfferPlies]). */
+    private var resumeOffer: ResumableGame? = null
 
     private fun newState(color: Color): GameUiState {
         val game = games.new()
@@ -80,6 +87,7 @@ class GameController(
     fun onBackground() {
         if (paused) return
         paused = true
+        persist()
         invalidateSearch()
         warmJob?.cancel()
         _state.update { if (it.engine is EngineStatus.Problem) it else it.copy(engine = EngineStatus.Idle) }
@@ -190,7 +198,7 @@ class GameController(
 
     fun resign() {
         val s = state.value
-        if (s.isOver) return
+        if (s.isOver || s.awaitingResume) return
         invalidateSearch()
         _state.update {
             it.copy(
@@ -201,6 +209,7 @@ class GameController(
                 engine = if (it.engine is EngineStatus.Problem) it.engine else EngineStatus.Idle,
             )
         }
+        persist()
     }
 
     fun claimDraw() {
@@ -208,6 +217,7 @@ class GameController(
         if (s.claimReasons.isEmpty()) return
         invalidateSearch()
         _state.update { it.copy(endedBy = GameOutcome.DrawClaimed, selected = null, targets = emptySet()) }
+        persist()
     }
 
     fun dismissClaim() {
@@ -220,7 +230,9 @@ class GameController(
 
     /** Нова партія; рушій лишається запущеним, між партіями діє `newGame()` (CONTRACTS 3.4). */
     fun newGame(playerColor: Color) {
+        if (state.value.awaitingResume) return
         invalidateSearch()
+        saver.abandonActive()
         val fresh = newState(playerColor)
         val keepProblem = state.value.engine as? EngineStatus.Problem
         _state.value = fresh.copy(engine = keepProblem ?: EngineStatus.Starting)
@@ -342,6 +354,76 @@ class GameController(
                 engine = if (it.engine is EngineStatus.Problem) it.engine else EngineStatus.Idle,
             )
         }
+        persist()
+    }
+
+    /** Збереження після кожної зміни партії; поки йде перевірка збереженої партії, нічого не пишемо. */
+    private fun persist() {
+        val s = state.value
+        if (!s.awaitingResume) saver.save(s)
+    }
+
+    // --- відновлення збереженої партії (CONTRACTS 5) ---
+
+    /**
+     * Запуск застосунку: шукає незавершену партію. До рішення користувача ходи заблоковані
+     * ([GameUiState.awaitingResume]); пошкоджені дані або помилка сховища дають звичайну нову партію.
+     */
+    fun checkForSavedGame() {
+        _state.update { it.copy(awaitingResume = true) }
+        scope.launch {
+            val found = try {
+                saver.findResumable()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            if (found == null) {
+                finishResumeCheck()
+            } else {
+                resumeOffer = found
+                _state.update { it.copy(resumeOfferPlies = found.game.moves.size) }
+            }
+        }
+    }
+
+    /** «Продовжити»: позиція, колір людини й ходи беруться зі збереженої партії; якщо черга рушія, він ходить. */
+    fun continueSavedGame() {
+        val offer = resumeOffer ?: return
+        resumeOffer = null
+        invalidateSearch()
+        saver.resume(offer)
+        pendingNewGame = true
+        _state.update {
+            it.copy(
+                game = offer.game,
+                playerColor = offer.playerColor,
+                flipped = false,
+                selected = null,
+                targets = emptySet(),
+                pendingPromotion = null,
+                endedBy = null,
+                claimDismissedAtPly = null,
+                awaitingResume = false,
+                resumeOfferPlies = null,
+                checkSquare = checkSquareOf(offer.game.position),
+            )
+        }
+        if (!paused && state.value.engineToMove) requestEngineMove()
+    }
+
+    /** «Нова партія»: збережену партію закрито як залишену, але не видалено. */
+    fun declineSavedGame() {
+        val offer = resumeOffer ?: return
+        resumeOffer = null
+        saver.discard(offer)
+        finishResumeCheck()
+    }
+
+    private fun finishResumeCheck() {
+        _state.update { it.copy(awaitingResume = false, resumeOfferPlies = null) }
+        if (!paused && state.value.engineToMove) requestEngineMove()
     }
 
     private fun checkSquareOf(position: Position): Square? {

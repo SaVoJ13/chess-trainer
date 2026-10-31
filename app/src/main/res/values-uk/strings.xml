@@ -43,10 +43,14 @@
     <string name="game_dialog_resign_title">Здатися?</string>
     <string name="game_dialog_resign_text">Партію буде завершено поразкою.</string>
     <string name="game_dialog_new_game_title">Почати нову партію?</string>
-    <string name="game_dialog_new_game_in_progress">Поточну партію буде втрачено.</string>
+    <string name="game_dialog_new_game_in_progress">Поточну партію буде залишено незавершеною.</string>
     <string name="game_dialog_play_white">Грати білими</string>
     <string name="game_dialog_play_black">Грати чорними</string>
     <string name="game_promotion_title">Перетворити пішака на</string>
+    <string name="game_resume_title">Продовжити партію?</string>
+    <string name="game_resume_text">У вас є незавершена партія проти рушія.</string>
+    <string name="game_resume_continue">Продовжити</string>
+    <string name="game_resume_new_game">Нова партія</string>
 
     <!-- Екран гри: доступність -->
     <string name="game_cd_board">Шахова дошка</string>
