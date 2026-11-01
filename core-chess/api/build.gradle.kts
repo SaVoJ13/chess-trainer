@@ -57,3 +57,15 @@ tasks.register<Exec>("apiCompatCheck") {
     val classesDir = layout.buildDirectory.dir("classes/kotlin/main").get().asFile.path
     commandLine(javaBin, script, "--classes", classesDir)
 }
+
+// Вимір метрики Handicap на справжньому Stockfish (CONTRACTS 3.5 п. 9, 11). Лише на ПК власника: потрібен
+// Stockfish, зібраний `core-chess/tools/handicap-calibration/build-stockfish.sh`. Не входить у `build`/`test`/CI.
+// Приклад: ./gradlew :core-chess:api:handicapMeasure --args="measure --seed 1"
+tasks.register<JavaExec>("handicapMeasure") {
+    description = "Вимір B300/B100/M1/H кроків Handicap (лише ПК; докладніше: core-chess/api/HANDICAP.md)"
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("org.chesstrainer.core.calibration.HandicapMeasureKt")
+    workingDir = rootProject.projectDir
+    maxHeapSize = "1g"
+}
