@@ -55,10 +55,13 @@ interface PuzzleSession {
     val state: PuzzleState
     suspend fun submit(move: Move): PuzzleStep
 
-    /** Кожен виклик дає наступний крок підказки (до FullMove). */
+    /**
+     * Кожен виклик дає наступний крок підказки (до FullMove).
+     * Після завершення задачі кидає [IllegalStateException]: UI має ховати кнопку підказки.
+     */
     fun hint(): Hint
 
-    /** Задача вважається не розв'язаною. */
+    /** Задача вважається не розв'язаною (`FAILED`); далі кожен хід дає [PuzzleStep.Finished]. Можна викликати будь-коли. */
     fun revealSolution(): List<Uci>
     fun result(): PuzzleResult
 }
@@ -66,7 +69,13 @@ interface PuzzleSession {
 enum class PuzzleState { IN_PROGRESS, SOLVED, FAILED }
 
 sealed interface PuzzleStep {
-    data class Correct(val opponentReply: Move?, val solved: Boolean) : PuzzleStep
+    /**
+     * Правильний хід. [opponentReply] це відповідь суперника (null, якщо лінію завершено).
+     * [lineCompleted] = true означає лише, що лінію розв'язку доведено до кінця, незалежно від стану:
+     * після [Wrong] чи [Hint.FullMove] стан `FAILED`, а `lineCompleted` усе одно стане true.
+     * Результат задачі UI бере зі [PuzzleSession.state], а не з цього поля.
+     */
+    data class Correct(val opponentReply: Move?, val lineCompleted: Boolean) : PuzzleStep
 
     /** Позиція не змінюється; спроба зараховується як FAILED. */
     data object Wrong : PuzzleStep

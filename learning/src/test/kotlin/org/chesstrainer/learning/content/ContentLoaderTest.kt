@@ -187,7 +187,7 @@ class ContentLoaderTest {
                 if (i % 2 == 1) continue // ходи суперника робить сесія
                 val step = s.submit(PuzzleTestSupport.mv(uci.value))
                 assertTrue("${p.id.value} ply ${i + 1}", step is PuzzleStep.Correct)
-                assertEquals(p.id.value, i == p.solution.size - 1, (step as PuzzleStep.Correct).solved)
+                assertEquals(p.id.value, i == p.solution.size - 1, (step as PuzzleStep.Correct).lineCompleted)
             }
             assertEquals(p.id.value, PuzzleState.SOLVED, s.state)
             assertEquals(0, s.result().wrongMoves)
