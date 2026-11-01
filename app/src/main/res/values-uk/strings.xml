@@ -103,4 +103,65 @@
     <string name="piece_black_bishop">Чорний слон</string>
     <string name="piece_black_knight">Чорний кінь</string>
     <string name="piece_black_pawn">Чорний пішак</string>
+
+    <!-- Games list and review -->
+    <string name="common_ok">Гаразд</string>
+    <string name="games_action_open">Партії</string>
+    <string name="games_title">Партії</string>
+    <string name="games_back">Назад</string>
+    <string name="games_empty">Збережених партій ще немає. Зіграйте партію або імпортуйте PGN-файл.</string>
+    <string name="games_mode_vs_engine">Проти рушія</string>
+    <string name="games_mode_imported">Імпортована</string>
+    <string name="games_mode_analysis">Дошка аналізу</string>
+    <string name="games_status_ongoing">Триває</string>
+    <string name="games_status_finished">Завершена</string>
+    <string name="games_result_white_wins">1-0, перемога білих</string>
+    <string name="games_result_black_wins">0-1, перемога чорних</string>
+    <string name="games_result_draw">½-½, нічия</string>
+    <string name="games_result_unknown">Без результату</string>
+    <plurals name="games_moves">
+        <item quantity="one">%d хід</item>
+        <item quantity="few">%d ходи</item>
+        <item quantity="many">%d ходів</item>
+        <item quantity="other">%d ходу</item>
+    </plurals>
+    <string name="games_updated">Оновлено %1$s</string>
+    <string name="games_action_export">Експорт</string>
+    <string name="games_action_delete">Видалити</string>
+    <string name="games_action_import">Імпорт PGN</string>
+    <string name="games_action_export_all">Експорт усіх</string>
+    <string name="games_delete_title">Видалити партію?</string>
+    <string name="games_delete_text">Партію буде видалено без можливості відновлення.</string>
+    <string name="games_open_failed">Цю партію не вдається відкрити. Можливо, запис пошкоджено; її можна видалити.</string>
+    <string name="review_title">Перегляд партії</string>
+    <string name="review_players">%1$s — %2$s</string>
+    <string name="review_position">Позиція після ходу %1$d з %2$d</string>
+    <string name="review_position_start">Початкова позиція</string>
+    <string name="review_first">На початок</string>
+    <string name="review_previous">Назад</string>
+    <string name="review_next">Вперед</string>
+    <string name="review_last">В кінець</string>
+    <string name="review_symbol_first">«</string>
+    <string name="review_symbol_previous">‹</string>
+    <string name="review_symbol_next">›</string>
+    <string name="review_symbol_last">»</string>
+    <string name="review_move_current">%1$s, поточний хід</string>
+    <string name="review_load_failed">Цю партію не вдається показати.</string>
+
+    <!-- PGN import and export -->
+    <string name="transfer_importing">Імпорт…</string>
+    <string name="transfer_import_title">Імпорт завершено</string>
+    <string name="transfer_import_summary">Імпортовано: %1$d, пропущено: %2$d.</string>
+    <string name="transfer_import_skipped">Пропущені партії (їхні номери у файлі): %1$s.</string>
+    <string name="transfer_import_no_games">У файлі не знайдено партій.</string>
+    <string name="transfer_import_too_large">Файл більший за 2 МБ. Нічого не імпортовано.</string>
+    <string name="transfer_import_too_many">У файлі понад 500 партій. Нічого не імпортовано.</string>
+    <string name="transfer_import_read_error">Файл не вдається прочитати. Нічого не імпортовано.</string>
+    <string name="transfer_export_title">Експорт PGN</string>
+    <string name="transfer_export_save">Зберегти у файл</string>
+    <string name="transfer_export_share">Поділитися</string>
+    <string name="transfer_export_saved">Файл збережено.</string>
+    <string name="transfer_export_failed">Не вдалося експортувати партії.</string>
+    <string name="transfer_export_nothing">Немає партій для експорту.</string>
+    <string name="transfer_share_chooser">Поділитися PGN</string>
 </resources>

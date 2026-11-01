@@ -103,4 +103,63 @@
     <string name="piece_black_bishop">Black bishop</string>
     <string name="piece_black_knight">Black knight</string>
     <string name="piece_black_pawn">Black pawn</string>
+
+    <!-- Games list and review -->
+    <string name="common_ok">OK</string>
+    <string name="games_action_open">Games</string>
+    <string name="games_title">Games</string>
+    <string name="games_back">Back</string>
+    <string name="games_empty">No saved games yet. Play a game or import a PGN file.</string>
+    <string name="games_mode_vs_engine">Against the engine</string>
+    <string name="games_mode_imported">Imported</string>
+    <string name="games_mode_analysis">Analysis board</string>
+    <string name="games_status_ongoing">In progress</string>
+    <string name="games_status_finished">Finished</string>
+    <string name="games_result_white_wins">1-0, White won</string>
+    <string name="games_result_black_wins">0-1, Black won</string>
+    <string name="games_result_draw">½-½, draw</string>
+    <string name="games_result_unknown">No result</string>
+    <plurals name="games_moves">
+        <item quantity="one">%d move</item>
+        <item quantity="other">%d moves</item>
+    </plurals>
+    <string name="games_updated">Updated %1$s</string>
+    <string name="games_action_export">Export</string>
+    <string name="games_action_delete">Delete</string>
+    <string name="games_action_import">Import PGN</string>
+    <string name="games_action_export_all">Export all</string>
+    <string name="games_delete_title">Delete the game?</string>
+    <string name="games_delete_text">The game will be deleted permanently.</string>
+    <string name="games_open_failed">This game cannot be opened. Its record may be damaged; you can delete it.</string>
+    <string name="review_title">Game review</string>
+    <string name="review_players">%1$s vs %2$s</string>
+    <string name="review_position">Position after move %1$d of %2$d</string>
+    <string name="review_position_start">Starting position</string>
+    <string name="review_first">To the start</string>
+    <string name="review_previous">Previous move</string>
+    <string name="review_next">Next move</string>
+    <string name="review_last">To the end</string>
+    <string name="review_symbol_first">«</string>
+    <string name="review_symbol_previous">‹</string>
+    <string name="review_symbol_next">›</string>
+    <string name="review_symbol_last">»</string>
+    <string name="review_move_current">%1$s, current move</string>
+    <string name="review_load_failed">This game cannot be shown.</string>
+
+    <!-- PGN import and export -->
+    <string name="transfer_importing">Importing…</string>
+    <string name="transfer_import_title">Import finished</string>
+    <string name="transfer_import_summary">Imported: %1$d, skipped: %2$d.</string>
+    <string name="transfer_import_skipped">Skipped games (their numbers in the file): %1$s.</string>
+    <string name="transfer_import_no_games">No games were found in the file.</string>
+    <string name="transfer_import_too_large">The file is larger than 2 MB. Nothing was imported.</string>
+    <string name="transfer_import_too_many">The file contains more than 500 games. Nothing was imported.</string>
+    <string name="transfer_import_read_error">The file could not be read. Nothing was imported.</string>
+    <string name="transfer_export_title">Export PGN</string>
+    <string name="transfer_export_save">Save to a file</string>
+    <string name="transfer_export_share">Share</string>
+    <string name="transfer_export_saved">The file was saved.</string>
+    <string name="transfer_export_failed">The games could not be exported.</string>
+    <string name="transfer_export_nothing">There are no games to export.</string>
+    <string name="transfer_share_chooser">Share PGN</string>
 </resources>

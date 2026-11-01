@@ -41,12 +41,37 @@ import org.chesstrainer.app.R
 import org.chesstrainer.app.game.GameUiState
 import org.chesstrainer.app.ui.theme.BoardColors
 import org.chesstrainer.core.model.Color as ChessColor
+import org.chesstrainer.core.model.Move
 import org.chesstrainer.core.model.Piece
 import org.chesstrainer.core.model.PieceType
+import org.chesstrainer.core.model.Position
 import org.chesstrainer.core.model.Square
 
 /** Стан перетягування: з якого поля й де зараз палець (у пікселях дошки). */
 private data class Drag(val from: Square, val at: Offset)
+
+/** Те, що потрібно намалювати на дошці: спільне для гри й перегляду партії. */
+data class BoardView(
+    val position: Position,
+    val bottomColor: ChessColor,
+    val lastMove: Move? = null,
+    val selected: Square? = null,
+    /** Поля, на які може піти вибрана фігура. */
+    val targets: Set<Square> = emptySet(),
+    val checkSquare: Square? = null,
+)
+
+internal fun GameUiState.boardView() = BoardView(position, bottomColor, lastMove, selected, targets, checkSquare)
+
+/** Дошка гри: торкання й перетягування. */
+@Composable
+fun ChessBoard(
+    state: GameUiState,
+    onSquareTap: (Square) -> Unit,
+    onDragStart: (Square) -> Boolean,
+    onDrop: (from: Square, to: Square?) -> Unit,
+    modifier: Modifier = Modifier,
+) = ChessBoard(state.boardView(), onSquareTap, onDragStart, onDrop, modifier)
 
 /**
  * Дошка: торкання й перетягування. Малюється одним `Canvas`; для доступності поверх лежать
@@ -54,7 +79,7 @@ private data class Drag(val from: Square, val at: Offset)
  */
 @Composable
 fun ChessBoard(
-    state: GameUiState,
+    state: BoardView,
     onSquareTap: (Square) -> Unit,
     onDragStart: (Square) -> Boolean,
     onDrop: (from: Square, to: Square?) -> Unit,
@@ -123,7 +148,7 @@ private fun cellOrigin(square: Square, cell: Float, bottom: ChessColor): Offset 
     return Offset(column * cell, row * cell)
 }
 
-private fun DrawScope.drawBoard(state: GameUiState, bottom: ChessColor, drag: Drag?, textMeasurer: TextMeasurer) {
+private fun DrawScope.drawBoard(state: BoardView, bottom: ChessColor, drag: Drag?, textMeasurer: TextMeasurer) {
     val cell = size.width / 8f
     val cellSize = Size(cell, cell)
     val position = state.position
@@ -191,7 +216,7 @@ private fun DrawScope.drawBoard(state: GameUiState, bottom: ChessColor, drag: Dr
 
 /** Семантичні вузли полів для екранних читачів: не беруть участі в обробці дотиків. */
 @Composable
-private fun SquareSemantics(state: GameUiState, bottom: ChessColor, onSquareTap: (Square) -> Unit) {
+private fun SquareSemantics(state: BoardView, bottom: ChessColor, onSquareTap: (Square) -> Unit) {
     val last = state.lastMove
     Column(Modifier.fillMaxSize()) {
         for (row in 0..7) {
