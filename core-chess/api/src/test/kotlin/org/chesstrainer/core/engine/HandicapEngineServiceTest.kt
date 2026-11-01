@@ -75,7 +75,7 @@ class HandicapEngineServiceTest {
         assertTrue(fake.moveRequests.isEmpty())
         assertEquals(50, fake.analysisRequests.size)
         val sent = fake.analysisRequests.first()
-        assertEquals(HandicapPolicy.CANDIDATES, sent.multiPv)
+        assertEquals(rules.legalMoves(rules.startPosition()).size, sent.multiPv)
         assertEquals(SearchLimit(depth = 1), sent.limit)
         assertEquals(EngineState.Ready, engine.state.value)
     }
@@ -98,20 +98,68 @@ class HandicapEngineServiceTest {
     }
 
     @Test
-    fun `random is consumed exactly twice per handicap move, also with a single candidate`() = runTest {
+    fun `random is consumed a fixed number of times per step, also with a single candidate`() = runTest {
         val random = CountingRandom(5)
+        // Кроки 1–2: 4 кидання (випадковий хід?, який, сліпа пляма, вибір); кроки 3–5: 2.
         val many = HandicapEngineService(scripted(listOf(30, 20, 0)), rules, random).also { it.start() }
         repeat(10) { many.bestMove(request(handicap(2))) }
-        assertEquals(20, random.draws)
+        assertEquals(40, random.draws)
+        repeat(10) { many.bestMove(request(handicap(1))) }
+        assertEquals(80, random.draws)
+        repeat(10) { many.bestMove(request(handicap(3))) }
+        assertEquals(100, random.draws)
 
         val single = HandicapEngineService(scripted(listOf(0)), rules, random).also { it.start() }
         repeat(5) { single.bestMove(request(handicap(5))) }
-        assertEquals(30, random.draws)
+        assertEquals(110, random.draws)
+        repeat(5) { single.bestMove(request(handicap(1))) }
+        assertEquals(130, random.draws)
 
         // Відхилені запити Random не витрачають.
         many.bestMove(request(handicap(2), matedFen))
-        assertEquals(30, random.draws)
+        assertEquals(130, random.draws)
+        for (step in 1..HandicapPolicy.STEPS) {
+            assertEquals(if (step <= 2) 4 else 2, HandicapPolicy.drawsPerMove(step))
+        }
     }
+
+    @Test
+    fun `candidates are all legal moves, limited only by the engine and by 64`() = runTest {
+        val fake = scripted(List(64) { 0 })
+        val engine = service(fake)
+        engine.bestMove(request(handicap(1)))
+        assertEquals(20, fake.analysisRequests.last().multiPv) // стартова позиція: 20 легальних ходів
+
+        // Рушій з меншим maxMultiPv: кандидати лише найкращі maxMultiPv ліній.
+        val limited = scripted(List(64) { 0 }, FakeEngineService(rules, FakeEngineService.DEFAULT_CAPABILITIES.copy(maxMultiPv = 7)))
+        val small = service(limited)
+        small.bestMove(request(handicap(1)))
+        assertEquals(7, limited.analysisRequests.last().multiPv)
+    }
+
+    @Test
+    fun `weak steps give a piece away sometimes but not on every move`() = runTest {
+        // 20 легальних ходів: десять «віддають фігуру» (−300), решта майже рівні. Оцінка білих = оцінка ходу.
+        val scores = List(20) { if (it % 2 == 1) -300 else 10 - it }
+        val fake = scripted(scores.sortedDescending())
+        val losers = scores.sortedDescending().withIndex().filter { it.value <= -300 }.map { it.index }
+        val moves = rules.legalMoves(rules.startPosition()).map { rules.toUci(it).value }.sorted()
+        val losing = losers.map { moves[it] }.toSet()
+        fun share(step: Int, seed: Int): Double {
+            val engine = HandicapEngineService(fake, rules, Random(seed)).also { runTest { it.start() } }
+            val n = 1500
+            val bad = (1..n).count {
+                val best = (kotlinx.coroutines.runBlocking { engine.bestMove(request(handicap(step))) } as ChessResult.Ok).value.best.value
+                best in losing
+            }
+            return bad.toDouble() / n
+        }
+        val shares = (1..HandicapPolicy.STEPS).map { share(it, 40 + it) }
+        assertTrue("step 1 gives a piece: $shares", shares[0] > 0.10 && shares[0] < 0.45)
+        for (i in 1 until shares.size) assertTrue("shares $shares", shares[i] <= shares[i - 1] + 0.02)
+        assertTrue("step 5: $shares", shares.last() < 0.06)
+    }
+
 
     @Test
     fun `strength mapping uses side to move perspective and mate scores`() = runTest {
@@ -274,21 +322,20 @@ class HandicapEngineServiceTest {
     fun `incomplete last iteration does not mix depths`() = runTest {
         val fake = FakeEngineService(rules)
         fake.onAnalyse {
+            val sorted = rules.legalMoves(rules.startPosition()).map { rules.toUci(it).value }.sorted()
             fun u(depth: Int, line: Int, cp: Int, mv: String) = AnalysisEvent.Update(
                 AnalysisUpdate(depth, null, line, Evaluation.Centipawns(cp), listOf(Uci(mv)), 1, 0, 0),
             )
-            listOf(
-                u(2, 1, 0, "a2a3"), u(2, 2, 0, "b2b3"), u(2, 3, 0, "c2c3"), u(2, 4, 0, "d2d3"), u(2, 5, 0, "e2e3"),
-                u(3, 1, 0, "a2a3"), u(3, 2, 0, "b2b3"), // глибина 3 урвалась: лише дві лінії
-                AnalysisEvent.Finished,
-            )
+            val deep2 = sorted.mapIndexed { i, mv -> u(2, i + 1, 0, mv) }
+            // Глибина 3 урвалась: лише дві лінії.
+            deep2 + listOf(u(3, 1, 0, sorted[0]), u(3, 2, 0, sorted[1]), AnalysisEvent.Finished)
         }
         val engine = service(fake)
         val seen = (1..300).map { seed ->
             val e = HandicapEngineService(fake, rules, Random(seed)).also { it.start() }
             (e.bestMove(request(handicap(1))) as ChessResult.Ok).value.best.value
         }.toSet()
-        // Береться повна глибина 2 з п'ятьма кандидатами, а не неповна глибина 3 з двома.
+        // Береться повна глибина 2 з усіма 20 кандидатами, а не неповна глибина 3 з двома.
         assertTrue(seen.size > 2)
         assertTrue(engine.state.value == EngineState.Ready)
     }
