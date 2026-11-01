@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1.0",
+  "packs": [
+    {"id": "tactics-sample", "kind": "PUZZLES", "languages": [], "itemCount": 200, "sourceIds": ["CT-001"]}
+  ]
+}
