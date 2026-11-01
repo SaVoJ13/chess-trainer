@@ -17,7 +17,8 @@ enum class GameMode { VS_ENGINE, ANALYSIS_BOARD, IMPORTED }
  * Збережена партія (CONTRACTS 5). Ходи й початкова позиція зберігаються лише в [pgn]; усе інше
  * (позицію, статус, список ходів) відновлюють `ChessGame` і `PgnCodec`.
  *
- * [difficultyId] до появи `DifficultyPresets` завжди `null` (заглушка `DifficultyId(0)` не зберігається).
+ * [difficultyId] записується для кожної партії проти рушія (v0.12); `null` бувають лише у записах,
+ * створених до v0.12 (вони відновлюються з `DifficultyId(10)`).
  */
 data class SavedGame(
     val id: GameId?,

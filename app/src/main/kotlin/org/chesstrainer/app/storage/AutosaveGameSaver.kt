@@ -9,6 +9,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import org.chesstrainer.app.game.DifficultyDefaults
 import org.chesstrainer.app.game.GameTermination
 import org.chesstrainer.app.game.GameUiState
 
@@ -130,6 +131,6 @@ class AutosaveGameSaver(
             close(saved)
             return null
         }
-        return ResumableGame(id, saved.createdAt, game, color)
+        return ResumableGame(id, saved.createdAt, game, color, saved.difficultyId ?: DifficultyDefaults.LEGACY_GAME)
     }
 }

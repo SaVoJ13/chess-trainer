@@ -52,6 +52,35 @@
     <string name="game_resume_continue">Continue</string>
     <string name="game_resume_new_game">New game</string>
 
+    <!-- Difficulty levels (CONTRACTS 3.5: difficulty_<id>) -->
+    <string name="difficulty_group_beginner">Beginner</string>
+    <string name="difficulty_group_amateur">Amateur</string>
+    <string name="difficulty_group_club">Club</string>
+    <string name="difficulty_group_strong">Strong</string>
+    <string name="difficulty_group_max">Maximum</string>
+    <string name="difficulty_1">Beginner 1</string>
+    <string name="difficulty_2">Beginner 2</string>
+    <string name="difficulty_3">Beginner 3</string>
+    <string name="difficulty_4">Beginner 4</string>
+    <string name="difficulty_5">Beginner 5</string>
+    <string name="difficulty_10">Amateur 1</string>
+    <string name="difficulty_11">Amateur 2</string>
+    <string name="difficulty_12">Amateur 3</string>
+    <string name="difficulty_20">Club 1</string>
+    <string name="difficulty_21">Club 2</string>
+    <string name="difficulty_30">Strong 1</string>
+    <string name="difficulty_31">Strong 2</string>
+    <string name="difficulty_99">Maximum</string>
+    <string name="difficulty_unknown">Level %1$d</string>
+    <string name="difficulty_approx_elo">≈ %1$d</string>
+
+    <!-- Game screen: difficulty -->
+    <string name="game_level_label">Level: %1$s</string>
+    <string name="game_dialog_level_title">Level</string>
+    <string name="game_dialog_level_loading">The engine is starting, the list of levels will appear shortly. Level: %1$s.</string>
+    <string name="game_level_unavailable">The level “%1$s” is not available on this device. Playing at “%2$s” instead.</string>
+    <string name="game_level_unavailable_ok">OK</string>
+
     <!-- Game screen: accessibility -->
     <string name="game_cd_board">Chessboard</string>
     <string name="game_cd_moves">Moves</string>

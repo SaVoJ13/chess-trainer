@@ -6,8 +6,10 @@ package org.chesstrainer.app.storage
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import org.chesstrainer.app.game.DifficultyDefaults
 import org.chesstrainer.app.game.GameOutcome
 import org.chesstrainer.app.game.GameUiState
+import org.chesstrainer.core.engine.DifficultyId
 import org.chesstrainer.core.game.ChessGame
 import org.chesstrainer.core.game.ChessGameFactory
 import org.chesstrainer.core.model.ChessResult
@@ -21,6 +23,8 @@ class ResumableGame(
     val createdAt: Instant,
     val game: ChessGame,
     val playerColor: Color,
+    /** Рівень партії; записи без рівня (до v0.12) відновлюються з [DifficultyDefaults.LEGACY_GAME]. */
+    val difficultyId: DifficultyId = DifficultyDefaults.LEGACY_GAME,
 )
 
 /**
@@ -45,7 +49,7 @@ class GamePersistence(
             pgn = pgn,
             mode = GameMode.VS_ENGINE,
             playerColor = state.playerColor,
-            difficultyId = null,
+            difficultyId = state.difficultyId,
             finished = outcome != null,
             termination = outcome?.termination,
             createdAt = createdAt,
