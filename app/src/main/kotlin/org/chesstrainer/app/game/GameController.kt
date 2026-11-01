@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.chesstrainer.app.settings.DifficultyPreferences
+import org.chesstrainer.app.storage.GameId
 import org.chesstrainer.app.storage.GameSaver
 import org.chesstrainer.app.storage.ResumableGame
 import org.chesstrainer.core.engine.DefaultDifficultyPresets
@@ -439,6 +440,40 @@ class GameController(
     fun continueSavedGame() {
         val offer = resumeOffer ?: return
         resumeOffer = null
+        applyResumed(offer)
+    }
+
+    /**
+     * Список партій: відкрити незавершену партію проти рушія тією самою логікою, що й «Продовжити» (позиція,
+     * колір, рівень). `false`, якщо партію не вдається відтворити. Якщо на екрані вже саме ця партія, нічого не
+     * змінюється (зберігаються орієнтація дошки й пошук рушія). Інша активна партія закривається як залишена.
+     */
+    suspend fun openSavedGame(id: GameId): Boolean {
+        if (state.value.awaitingResume) return false
+        val offer = try {
+            saver.find(id)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } ?: return false
+        val s = state.value
+        val sameAsShown = !s.isOver && s.playerColor == offer.playerColor &&
+            s.game.moves.map { it.uci } == offer.game.moves.map { it.uci }
+        if (!sameAsShown) applyResumed(offer)
+        return true
+    }
+
+    /**
+     * Партію, що була активною, видалено зі списку: екран гри не лишається на видаленій партії, починається
+     * нова з тими самими кольором і рівнем (стан автозбереження вже скинуто в [GameSaver.delete]).
+     */
+    fun onActiveGameDeleted() {
+        val s = state.value
+        newGame(s.playerColor, s.difficultyId)
+    }
+
+    private fun applyResumed(offer: ResumableGame) {
         invalidateSearch()
         saver.resume(offer)
         pendingNewGame = true

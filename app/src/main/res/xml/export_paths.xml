@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- FileProvider відкриває лише підкаталог кешу з експортованими PGN (CONTRACTS 5), решта сховища недоступна. -->
+<paths>
+    <cache-path name="pgn_exports" path="exports/" />
+</paths>

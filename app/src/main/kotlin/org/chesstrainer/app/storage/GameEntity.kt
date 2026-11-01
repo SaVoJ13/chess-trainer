@@ -23,3 +23,12 @@ data class GameEntity(
     val createdAt: Long,
     val updatedAt: Long,
 )
+
+/** Лише поля, потрібні списку партій; решта стовпців (колір, рівень, причина завершення) не читається. */
+data class GameSummaryRow(
+    val id: Long,
+    val mode: String,
+    val finished: Boolean,
+    val updatedAt: Long,
+    val pgn: String,
+)

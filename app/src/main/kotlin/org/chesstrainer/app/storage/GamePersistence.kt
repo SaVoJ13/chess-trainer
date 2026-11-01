@@ -68,6 +68,19 @@ class GamePersistence(
         }
     }
 
+    /**
+     * Партія для перегляду на дошці (будь-який режим). Результат береться з `PgnGame.result`, а не зі статусу
+     * партії: для імпортованих він може відрізнятися (здача, час, нічия за згодою; CONTRACTS 3.2).
+     * `null`, якщо PGN не вдається прочитати або відтворити.
+     */
+    fun decodeForReview(saved: SavedGame): ReviewedGame? = try {
+        val parsed = codec.parse(saved.pgn).firstOrNull() as? ChessResult.Ok
+        val game = parsed?.let { (games.fromPgn(it.value) as? ChessResult.Ok)?.value }
+        if (parsed == null || game == null) null else ReviewedGame(game, parsed.value.result, parsed.value.headers)
+    } catch (e: RuntimeException) {
+        null
+    }
+
     private fun pgnResultOf(outcome: GameOutcome?): PgnResult = when (outcome) {
         null -> PgnResult.UNKNOWN
         is GameOutcome.Checkmate -> winnerResult(outcome.winner)
@@ -85,3 +98,6 @@ class GamePersistence(
         val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
     }
 }
+
+/** Партія для перегляду: ходи, результат з тегу PGN і теги (дані, не тексти інтерфейсу). */
+class ReviewedGame(val game: ChessGame, val result: PgnResult, val headers: Map<String, String>)

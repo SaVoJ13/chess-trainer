@@ -84,7 +84,7 @@ private val MinTouch = 48.dp
 
 /** Екран гри «людина проти рушія». */
 @Composable
-fun GameScreen(controller: GameController) {
+fun GameScreen(controller: GameController, onOpenGames: () -> Unit = {}) {
     val state by controller.state.collectAsState()
     var dialog by rememberSaveable { mutableStateOf(GameDialog.NONE) }
 
@@ -98,7 +98,7 @@ fun GameScreen(controller: GameController) {
                     StatusLine(state)
                     Notices(state, controller)
                     MoveList(state, vertical = true, modifier = Modifier.weight(1f).fillMaxWidth())
-                    ActionButtons(state, controller, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
+                    ActionButtons(state, controller, onOpenGames, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
                 }
             }
         } else {
@@ -113,7 +113,7 @@ fun GameScreen(controller: GameController) {
                 Notices(state, controller)
                 MoveList(state, vertical = false, modifier = Modifier.fillMaxWidth().height(44.dp))
                 Spacer(Modifier.weight(1f))
-                ActionButtons(state, controller, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
+                ActionButtons(state, controller, onOpenGames, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
             }
         }
     }
@@ -317,6 +317,7 @@ private fun MoveList(state: GameUiState, vertical: Boolean, modifier: Modifier =
 private fun ActionButtons(
     state: GameUiState,
     controller: GameController,
+    onOpenGames: () -> Unit,
     onResign: () -> Unit,
     onNewGame: () -> Unit,
 ) {
@@ -324,6 +325,7 @@ private fun ActionButtons(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ActionButton(R.string.game_action_undo, enabled = state.canUndo, onClick = controller::undo)
             ActionButton(R.string.game_action_flip, enabled = true, onClick = controller::flipBoard)
+            ActionButton(R.string.games_action_open, enabled = true, onClick = onOpenGames)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ActionButton(R.string.game_action_resign, enabled = !state.isOver, onClick = onResign)

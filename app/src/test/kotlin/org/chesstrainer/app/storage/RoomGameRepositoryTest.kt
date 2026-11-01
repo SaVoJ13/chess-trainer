@@ -4,10 +4,12 @@
 package org.chesstrainer.app.storage
 
 import java.time.Instant
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.chesstrainer.app.game.GameTermination
 import org.chesstrainer.core.engine.DifficultyId
 import org.chesstrainer.core.model.Color
+import org.chesstrainer.core.pgn.PgnResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -38,6 +40,13 @@ class RoomGameRepositoryTest {
 
         override suspend fun delete(id: Long) {
             rows.remove(id)
+        }
+
+        override fun observeRows(): kotlinx.coroutines.flow.Flow<List<GameSummaryRow>> = kotlinx.coroutines.flow.flow {
+            emit(
+                rows.values.sortedWith(compareByDescending<GameEntity> { it.updatedAt }.thenByDescending { it.id })
+                    .map { GameSummaryRow(it.id, it.mode, it.finished, it.updatedAt, it.pgn) },
+            )
         }
 
         override suspend fun lastUnfinished() =
@@ -126,5 +135,46 @@ class RoomGameRepositoryTest {
         assertNotNull(found)
         assertEquals(good, found!!.id)
         assertEquals(2, dao.rows.values.count { it.finished && it.termination == "ABANDONED" })
+    }
+
+    private fun pgn(moves: String, result: String) = "[Event \"?\"]\n[Result \"$result\"]\n\n$moves $result\n"
+
+    @Test
+    fun observeAllIsNewestFirstWithPlyCountAndResultFromThePgn() = runBlocking {
+        val repo = RoomGameRepository(MemoryDao())
+        val old = repo.save(game.copy(pgn = pgn("1. e4 e5 2. Nf3", "*"), updatedAt = Instant.ofEpochMilli(1_000)))
+        val imported = repo.save(
+            game.copy(
+                pgn = pgn("1. f3 e5 2. g4 Qh4#", "0-1"), mode = GameMode.IMPORTED, playerColor = null,
+                finished = true, updatedAt = Instant.ofEpochMilli(5_000),
+            ),
+        )
+        val list = repo.observeAll().first()
+        assertEquals(listOf(imported, old), list.map { it.id })
+        assertEquals(4, list[0].plyCount)
+        assertEquals(PgnResult.BLACK_WINS, list[0].result)
+        assertEquals(GameMode.IMPORTED, list[0].mode)
+        assertTrue(list[0].finished)
+        assertEquals(Instant.ofEpochMilli(5_000), list[0].updatedAt)
+        assertEquals(3, list[1].plyCount)
+        assertEquals(PgnResult.UNKNOWN, list[1].result)
+        assertTrue(!list[1].finished)
+    }
+
+    @Test
+    fun observeAllKeepsUnreadablePgnAsEmptyAndSkipsUnknownMode() = runBlocking {
+        val dao = MemoryDao()
+        val repo = RoomGameRepository(dao)
+        val bad = repo.save(game.copy(pgn = "це не PGN {{{", updatedAt = Instant.ofEpochMilli(3_000)))
+        dao.upsert(
+            GameEntity(
+                pgn = "x", mode = "FROM_THE_FUTURE", playerColor = null, difficultyId = null,
+                finished = false, termination = null, createdAt = 0, updatedAt = 9_000,
+            ),
+        )
+        val list = repo.observeAll().first()
+        assertEquals(listOf(bad), list.map { it.id })
+        assertEquals(0, list[0].plyCount)
+        assertEquals(PgnResult.UNKNOWN, list[0].result)
     }
 }

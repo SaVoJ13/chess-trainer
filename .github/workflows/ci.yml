@@ -44,6 +44,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       # Збірка, unit-тести всіх модулів, швидкий perft (CONTRACTS 7.1).
       - run: ./gradlew build
+      # Перевірка навчального контенту (CONTRACTS 6.1, content/README.md): формат, легальність ходів, унікальність id,
+      # джерела зі статусом «Перевірено»/«Власний» у docs/THIRD_PARTY.md. `--args` у Gradle замінює аргументи завдання,
+      # тому шлях і реєстр повторено тут повністю (як у content/README.md).
+      - name: Validate learning content
+        run: ./gradlew :learning:validateContent --args="--content content/common --registry docs/THIRD_PARTY.md --require-verified"
       # Звіт ліцензій актуальний (CONTRACTS 7.1, v0.11). Те саме завдання, яким звіт генерують локально:
       # варіант Release (звіт описує releaseRuntimeClasspath), завдання без суфікса неоднозначне.
       # Експорт відтворюваний: два запуски дають побайтно однаковий файл, мережа не потрібна (offlineMode).

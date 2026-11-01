@@ -19,6 +19,15 @@ interface GameSaver {
     /** Остання незавершена партія для пропозиції «Продовжити»; пошкоджені записи закриваються й пропускаються. */
     suspend fun findResumable(): ResumableGame?
 
+    /** Незавершена партія проти рушія за id (зі списку партій); `null`, якщо її немає, вона завершена чи пошкоджена. */
+    suspend fun find(id: GameId): ResumableGame?
+
+    /**
+     * Видалення партії зі списку. `true`, якщо це була активна партія автозбереження (її стан скинуто, наступне
+     * збереження створить новий запис): тоді екран гри не має лишатися на видаленій партії.
+     */
+    suspend fun delete(id: GameId): Boolean
+
     /** Користувач обрав «Продовжити»: наступні збереження оновлюють цей запис. */
     fun resume(game: ResumableGame)
 
@@ -32,6 +41,10 @@ interface GameSaver {
         override fun abandonActive() = Unit
 
         override suspend fun findResumable(): ResumableGame? = null
+
+        override suspend fun find(id: GameId): ResumableGame? = null
+
+        override suspend fun delete(id: GameId): Boolean = false
 
         override fun resume(game: ResumableGame) = Unit
 

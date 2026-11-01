@@ -3,10 +3,9 @@
 
 package org.chesstrainer.app.storage
 
-/**
- * Сховище партій (CONTRACTS 5). Частина контракту (`delete`, `observeAll`, `SavedGameSummary`) додається
- * разом зі списком збережених партій; зараз потрібне лише автозбереження.
- */
+import kotlinx.coroutines.flow.Flow
+
+/** Сховище партій (CONTRACTS 5). */
 interface GameRepository {
     /** Вставка (`id == null`) або оновлення; повертає ідентифікатор запису. */
     suspend fun save(game: SavedGame): GameId
@@ -14,6 +13,9 @@ interface GameRepository {
     suspend fun load(id: GameId): SavedGame?
 
     suspend fun delete(id: GameId)
+
+    /** Усі партії для списку за `updatedAt` спаданням; нове значення при кожній зміні таблиці. */
+    fun observeAll(): Flow<List<SavedGameSummary>>
 
     /** Остання за часом оновлення незавершена партія, придатна для відновлення. */
     suspend fun lastUnfinished(): SavedGame?

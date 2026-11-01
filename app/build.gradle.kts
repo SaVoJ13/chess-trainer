@@ -79,3 +79,18 @@ dependencies {
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
+
+// Навчальний контент у APK (CONTRACTS 6.1, «Пакування»): лише manifest.json і файли пакетів із content/common,
+// без інструментів, дампів і параметрів перевірки. У assets вони лежать за тим самим шляхом, що й у репозиторії:
+// content/common/manifest.json, content/common/puzzles/<пакет>.json.
+val contentAssetsDir = layout.buildDirectory.dir("generated/contentAssets")
+val prepareContentAssets by tasks.registering(Sync::class) {
+    from(rootProject.layout.projectDirectory.dir("content/common")) {
+        include("manifest.json", "puzzles/*.json")
+    }
+    into(contentAssetsDir.map { it.dir("content/common") })
+}
+android.sourceSets.getByName("main").assets.directories.add(contentAssetsDir.get().asFile.path)
+// Каталог згенерований, тому його читачі (злиття assets і перевірки lint) явно залежать від копіювання.
+tasks.matching { (it.name.startsWith("merge") && it.name.endsWith("Assets")) || it.name.contains("lint", ignoreCase = true) }
+    .configureEach { dependsOn(prepareContentAssets) }
