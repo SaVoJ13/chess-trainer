@@ -36,3 +36,6 @@ google-services.json
 
 # Кеш мережі NNUE (98 МБ, завантажується збіркою engine-android)
 .nnue-cache/
+
+# Дамп бази задач Lichess та інші завантаження для підготовки контенту (сотні МБ; docs/THIRD_PARTY.md, CT-001)
+.content-cache/
