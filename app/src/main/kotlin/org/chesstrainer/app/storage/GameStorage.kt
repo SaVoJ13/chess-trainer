@@ -13,25 +13,35 @@ import org.chesstrainer.core.pgn.DefaultPgnCodec
 import org.chesstrainer.core.rules.ChesslibRules
 
 /**
- * Єдине на процес автозбереження: черга записів не залежить від життя екрана, тому зберігання, розпочате
- * при виході з екрана, завершується, а новий екран бачить усі попередні записи.
+ * Єдині на процес сховище й автозбереження: черга записів не залежить від життя екрана, тому зберігання,
+ * розпочате при виході з екрана, завершується, а новий екран бачить усі попередні записи. Список партій
+ * і автозбереження працюють з одним [GameRepository].
  */
 object GameStorage {
     private const val TAG = "GameStorage"
 
     @Volatile
-    private var saver: GameSaver? = null
+    private var holder: Holder? = null
 
-    fun saver(context: Context): GameSaver =
-        saver ?: synchronized(this) { saver ?: create(context.applicationContext).also { saver = it } }
+    private class Holder(val repository: GameRepository, val saver: GameSaver)
 
-    private fun create(context: Context): GameSaver {
+    fun saver(context: Context): GameSaver = holder(context).saver
+
+    fun repository(context: Context): GameRepository = holder(context).repository
+
+    private fun holder(context: Context): Holder =
+        holder ?: synchronized(this) { holder ?: create(context.applicationContext).also { holder = it } }
+
+    private fun create(context: Context): Holder {
         val rules = ChesslibRules()
-        return AutosaveGameSaver(
-            repository = RoomGameRepository(GameDatabase.create(context).games()),
-            persistence = GamePersistence(DefaultChessGameFactory(rules), DefaultPgnCodec(rules)),
+        val codec = DefaultPgnCodec(rules)
+        val repository = RoomGameRepository(GameDatabase.create(context).games(), codec)
+        val saver = AutosaveGameSaver(
+            repository = repository,
+            persistence = GamePersistence(DefaultChessGameFactory(rules), codec),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             onError = { Log.w(TAG, "Autosave operation failed", it) },
         )
+        return Holder(repository, saver)
     }
 }

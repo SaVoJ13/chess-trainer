@@ -70,6 +70,9 @@ class AutosaveTest {
             rows.remove(id.value)
         }
 
+        override fun observeAll(): kotlinx.coroutines.flow.Flow<List<SavedGameSummary>> =
+            kotlinx.coroutines.flow.flowOf(emptyList())
+
         override suspend fun lastUnfinished(): SavedGame? {
             if (failing) throw IOException("test: disk error")
             return rows.values.filter { !it.finished }.maxWithOrNull(compareBy({ it.updatedAt }, { it.id!!.value }))
@@ -633,5 +636,121 @@ class AutosaveTest {
         s.playRound("e2", "e4")
         s.flush()
         assertEquals("зберігається рівень, на якому справді грали", DifficultyIds.ELO_MIN, repo.rows.values.single().difficultyId)
+    }
+
+    // --- список партій: видалення й відкриття ---
+
+    @Test
+    fun deletingTheActiveGameResetsAutosaveAndTheScreenStartsFresh() = scenario { scope ->
+        val repo = MemoryRepository()
+        val s = Session(repo, scope)
+        s.controller.start()
+        s.playRound("e2", "e4")
+        s.flush()
+        val oldId = GameId(repo.rows.keys.single())
+
+        assertTrue("це була активна партія", s.saver.delete(oldId))
+        s.controller.onActiveGameDeleted()
+        assertTrue(repo.rows.isEmpty())
+        assertTrue("екран не лишається на видаленій партії", s.state.game.moves.isEmpty())
+
+        s.playRound("d2", "d4")
+        s.flush()
+        val row = repo.rows.values.single()
+        assertTrue("нова партія пишеться в новий запис", row.id != oldId)
+        assertEquals(2, s.decode(row).moves.size)
+        assertTrue(s.errors.isEmpty())
+    }
+
+    @Test
+    fun deletingAnotherGameKeepsTheActiveOne() = scenario { scope ->
+        val repo = MemoryRepository()
+        val other = repo.insert(damaged("[Event \"?\"]\n\n1. d4 *\n").copy(finished = true))
+        val s = Session(repo, scope)
+        s.controller.start()
+        s.playRound("e2", "e4")
+        s.flush()
+
+        assertFalse(s.saver.delete(other))
+        assertNull(repo.rows[other.value])
+        s.playRound("d2", "d4")
+        s.flush()
+        assertEquals("активний запис далі оновлюється", 1, repo.rows.size)
+        assertEquals(4, s.decode(repo.rows.values.single()).moves.size)
+    }
+
+    @Test
+    fun openingAnUnfinishedGameFromTheListContinuesItOnTheSameRecord() = scenario { scope ->
+        val repo = MemoryRepository()
+        val first = Session(repo, scope)
+        first.controller.start()
+        first.playRound("e2", "e4")
+        first.flush()
+        val savedId = GameId(repo.rows.keys.single())
+
+        val s = Session(repo, scope, clockStart = 5_000)
+        s.controller.start()
+        assertTrue(s.controller.openSavedGame(savedId))
+        assertEquals(2, s.state.game.moves.size)
+        assertEquals(Color.WHITE, s.state.playerColor)
+
+        s.humanMove()
+        s.await { it.game.moves.size == 4 && it.engine == EngineStatus.Idle }
+        s.flush()
+        assertEquals(1, repo.rows.size)
+        assertEquals(4, s.decode(repo.rows.getValue(savedId.value)).moves.size)
+    }
+
+    @Test
+    fun openingAnotherUnfinishedGameClosesTheActiveOneAsAbandoned() = scenario { scope ->
+        val repo = MemoryRepository()
+        val older = Session(repo, scope)
+        older.controller.start()
+        older.playRound("e2", "e4")
+        older.flush()
+        val olderId = GameId(repo.rows.keys.single())
+
+        val s = Session(repo, scope, clockStart = 5_000)
+        s.controller.start()
+        s.playRound("d2", "d4")
+        s.flush()
+        val activeId = repo.rows.keys.single { it != olderId.value }
+
+        assertTrue(s.controller.openSavedGame(olderId))
+        s.flush()
+        val closed = repo.rows.getValue(activeId)
+        assertTrue(closed.finished)
+        assertEquals(GameTermination.ABANDONED, closed.termination)
+        assertFalse(repo.rows.getValue(olderId.value).finished)
+    }
+
+    @Test
+    fun openingTheGameAlreadyOnScreenChangesNothing() = scenario { scope ->
+        val repo = MemoryRepository()
+        val s = Session(repo, scope)
+        s.controller.start()
+        s.playRound("e2", "e4")
+        s.flush()
+        s.controller.flipBoard()
+
+        assertTrue(s.controller.openSavedGame(GameId(repo.rows.keys.single())))
+        assertTrue("орієнтація дошки збережена", s.state.flipped)
+        assertEquals(2, s.state.game.moves.size)
+    }
+
+    @Test
+    fun finishedMissingOrDamagedGamesCannotBeContinued() = scenario { scope ->
+        val repo = MemoryRepository()
+        val finished = repo.insert(damaged("[Event \"?\"]\n\n1. e4 *\n").copy(finished = true))
+        val broken = repo.insert(damaged("це не PGN {{{"))
+        val s = Session(repo, scope)
+        s.controller.start()
+
+        assertFalse(s.controller.openSavedGame(finished))
+        assertFalse(s.controller.openSavedGame(broken))
+        assertFalse(s.controller.openSavedGame(GameId(999)))
+        s.flush()
+        assertFalse("пошкоджений запис не змінюється", repo.rows.getValue(broken.value).finished)
+        assertTrue(s.state.game.moves.isEmpty())
     }
 }

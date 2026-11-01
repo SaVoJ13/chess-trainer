@@ -7,6 +7,7 @@ import java.time.Instant
 import org.chesstrainer.app.game.GameTermination
 import org.chesstrainer.core.engine.DifficultyId
 import org.chesstrainer.core.model.Color
+import org.chesstrainer.core.pgn.PgnResult
 
 @JvmInline
 value class GameId(val value: Long)
@@ -30,4 +31,17 @@ data class SavedGame(
     val termination: GameTermination?,
     val createdAt: Instant,
     val updatedAt: Instant,
+)
+
+/**
+ * Рядок списку партій (CONTRACTS 5). [result] і [plyCount] обчислюються з PGN через `PgnCodec` і не
+ * зберігаються; для партії, яку не вдається прочитати, це [PgnResult.UNKNOWN] і 0.
+ */
+data class SavedGameSummary(
+    val id: GameId,
+    val mode: GameMode,
+    val result: PgnResult,
+    val finished: Boolean,
+    val updatedAt: Instant,
+    val plyCount: Int,
 )

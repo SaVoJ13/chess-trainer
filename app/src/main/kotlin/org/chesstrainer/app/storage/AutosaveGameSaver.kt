@@ -59,8 +59,23 @@ class AutosaveGameSaver(
 
     override suspend fun findResumable(): ResumableGame? = enqueue { find() }
 
+    override suspend fun find(id: GameId): ResumableGame? = enqueue {
+        val saved = repository.load(id)
+        if (saved == null || saved.finished) null else resumable(saved)
+    }
+
+    override suspend fun delete(id: GameId): Boolean = enqueue {
+        val wasActive = activeId == id
+        if (wasActive) takeActive()
+        repository.delete(id)
+        wasActive
+    }
+
     override fun resume(game: ResumableGame) {
         queue.trySend {
+            // Відкрито іншу незавершену партію зі списку: попередню активну закрито, а не загублено.
+            val previous = takeActive()
+            if (previous != null && previous != game.id) abandon(previous)
             activeId = game.id
             activeCreatedAt = game.createdAt
         }
@@ -123,14 +138,19 @@ class AutosaveGameSaver(
     private suspend fun find(): ResumableGame? {
         takeActive()
         val saved = repository.lastUnfinished() ?: return null
+        return resumable(saved) ?: run {
+            // Пошкоджені дані: запис закрито, застосунок починає нову партію.
+            close(saved)
+            null
+        }
+    }
+
+    /** `null`, якщо запис не вдається відтворити як партію проти рушія (запис при цьому не змінюється). */
+    private fun resumable(saved: SavedGame): ResumableGame? {
         val id = saved.id
         val game = persistence.decode(saved)
         val color = saved.playerColor
-        if (id == null || game == null || color == null) {
-            // Пошкоджені дані: запис закрито, застосунок починає нову партію.
-            close(saved)
-            return null
-        }
+        if (id == null || game == null || color == null) return null
         return ResumableGame(id, saved.createdAt, game, color, saved.difficultyId ?: DifficultyDefaults.LEGACY_GAME)
     }
 }
