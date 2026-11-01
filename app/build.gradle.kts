@@ -35,6 +35,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // MVP: лише arm64-v8a (MASTER_SPEC 4, CONTRACTS 7.2)
         ndk {
@@ -56,6 +57,9 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // MigrationTestHelper читає експортовані схеми з assets інструментованого тесту.
+    sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
 }
 
 dependencies {
@@ -73,6 +77,11 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(testFixtures(project(":core-chess:api")))
+
+    // Лише інструментовані тести (SW-019, SW-023): тест міграції Room на телефоні. У APK не потрапляє.
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.room.testing)
 }
 
 // Room (SW-004): схема експортується з першої версії; кожна зміна схеми має міграцію й тест (CONTRACTS 5).
