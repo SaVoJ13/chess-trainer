@@ -28,7 +28,7 @@ class PuzzleSessionTest {
     fun correctSingleMoveSolves() = runBlocking {
         val s = session(puzzle("a"))
         assertEquals(PuzzleState.IN_PROGRESS, s.state)
-        assertEquals(PuzzleStep.Correct(null, solved = true), s.submit(mv("a1a8")))
+        assertEquals(PuzzleStep.Correct(null, lineCompleted = true), s.submit(mv("a1a8")))
         assertEquals(PuzzleState.SOLVED, s.state)
         assertEquals(PuzzleStep.Finished, s.submit(mv("a1a8")))
         assertEquals(PuzzleState.SOLVED, s.result().state)
@@ -40,10 +40,10 @@ class PuzzleSessionTest {
         val s = session(p)
         val start = s.position
         val step = s.submit(mv(p.solution[0].value))
-        assertEquals(PuzzleStep.Correct(mv(p.solution[1].value), solved = false), step)
+        assertEquals(PuzzleStep.Correct(mv(p.solution[1].value), lineCompleted = false), step)
         assertTrue("position advanced", s.position != start)
         assertEquals(PuzzleState.IN_PROGRESS, s.state)
-        assertEquals(PuzzleStep.Correct(null, solved = true), s.submit(mv(p.solution[2].value)))
+        assertEquals(PuzzleStep.Correct(null, lineCompleted = true), s.submit(mv(p.solution[2].value)))
         assertEquals(PuzzleState.SOLVED, s.state)
     }
 
@@ -60,7 +60,7 @@ class PuzzleSessionTest {
         assertEquals(PuzzleStep.Wrong, s.submit(wrong))
         // Далі можна довести розв'язок до кінця, результат лишається FAILED.
         assertTrue(s.submit(mv(p.solution[0].value)) is PuzzleStep.Correct)
-        assertEquals(PuzzleStep.Correct(null, solved = true), s.submit(mv(p.solution[2].value)))
+        assertEquals(PuzzleStep.Correct(null, lineCompleted = true), s.submit(mv(p.solution[2].value)))
         val r = s.result()
         assertEquals(PuzzleState.FAILED, r.state)
         assertEquals(2, r.wrongMoves)
@@ -77,7 +77,7 @@ class PuzzleSessionTest {
     @Test
     fun alternativeMateIsAccepted() = runBlocking {
         val s = session(puzzle("a", fen = PuzzleTestSupport.TWO_ROOKS_FEN, solution = listOf("a1a8")))
-        assertEquals(PuzzleStep.Correct(null, solved = true), s.submit(mv("b1b8")))
+        assertEquals(PuzzleStep.Correct(null, lineCompleted = true), s.submit(mv("b1b8")))
         assertEquals(PuzzleState.SOLVED, s.state)
         assertTrue(rules.isCheckmate(s.position))
     }
@@ -95,7 +95,7 @@ class PuzzleSessionTest {
         val s = session(
             puzzle("a", fen = PuzzleTestSupport.TWO_ROOKS_FEN, solution = listOf("b1b2", "g8f8", "a1a8")),
         )
-        assertEquals(PuzzleStep.Correct(null, solved = true), s.submit(mv("a1a8")))
+        assertEquals(PuzzleStep.Correct(null, lineCompleted = true), s.submit(mv("a1a8")))
         assertEquals(PuzzleState.SOLVED, s.state)
         assertEquals(PuzzleStep.Finished, s.submit(mv("b1b2")))
     }
@@ -113,7 +113,7 @@ class PuzzleSessionTest {
         assertEquals(Hint.FullMove(mv("a1a8")), s.hint()) // повтор не рахується
         assertEquals(3, s.result().hintsUsed)
         // Задачу можна довести до кінця; результат FAILED.
-        assertEquals(PuzzleStep.Correct(null, solved = true), s.submit(mv("a1a8")))
+        assertEquals(PuzzleStep.Correct(null, lineCompleted = true), s.submit(mv("a1a8")))
         assertEquals(PuzzleState.FAILED, s.result().state)
     }
 
@@ -165,7 +165,39 @@ class PuzzleSessionTest {
     }
 
     @Test
-    fun resultCountsTimeAndStopsAtFinish() = runBlocking {
+    fun hintAfterLineCompletedIsProgrammerError() = runBlocking {
+        val s = session(puzzle("a"))
+        assertEquals(PuzzleStep.Correct(null, lineCompleted = true), s.submit(mv("a1a8")))
+        try {
+            s.hint()
+            fail("expected IllegalStateException")
+        } catch (_: IllegalStateException) {
+        }
+        assertEquals(0, s.result().hintsUsed)
+    }
+
+    @Test
+    fun lineCompletedAfterWrongKeepsFailed() = runBlocking {
+        val s = session(puzzle("a"))
+        assertEquals(PuzzleStep.Wrong, s.submit(mv("a1a7")))
+        assertEquals(PuzzleStep.Correct(null, lineCompleted = true), s.submit(mv("a1a8")))
+        assertEquals(PuzzleState.FAILED, s.state)
+        assertEquals(PuzzleStep.Finished, s.submit(mv("a1a8")))
+    }
+
+    @Test
+    fun revealSolutionMidwayFailsAndFinishes() = runBlocking {
+        val p = threePly()
+        val s = session(p)
+        s.submit(mv(p.solution[0].value))
+        assertEquals(PuzzleState.IN_PROGRESS, s.state)
+        assertEquals(p.solution, s.revealSolution())
+        assertEquals(PuzzleState.FAILED, s.state)
+        assertEquals(PuzzleStep.Finished, s.submit(mv(p.solution[2].value)))
+    }
+
+    @Test
+    fun resultCountsTimeAndStopsAtFinish()= runBlocking {
         val s = session(puzzle("a"))
         clock += 1500.milliseconds
         assertEquals(1500L, s.result().timeMs)

@@ -178,6 +178,14 @@
 
 (додавайте нові записи зверху)
 
+### 2026-11-01 Навчання і контент (сесія 3: PuzzleStep.Correct.solved → lineCompleted)
+Що зроблено: виконано запит Архітектора (CONTRACTS 4.1, v0.16): поле `PuzzleStep.Correct.solved` перейменовано на `lineCompleted` у `learning/` (тип, `DefaultPuzzleSession`, тести). Оновлено KDoc у `PuzzleStep.Correct`, `PuzzleSession.hint()`/`revealSolution()`, `DefaultPuzzleSession`, `LoadValidation` (у застосунку лише `STRUCTURE`, `FULL` для інструментів і тестів). Додано тести: `hint()` після завершення лінії кидає `IllegalStateException`; `Wrong` + кінець лінії = `FAILED` і `lineCompleted = true`; `revealSolution()` посеред задачі дає `FAILED` і далі `Finished`. Наявні тести (чисте розв'язання, `FullMove` + кінець лінії, альтернативний мат, `Finished` після завершення) лише перейменовані, не вимкнені.
+Що змінено (файли/модулі): `learning/src/main/…/puzzle/{PuzzleModel,DefaultPuzzleSession}.kt`, `…/content/ContentLoader.kt` (лише KDoc), тести `PuzzleSessionTest`, `ContentLoaderTest`; `docs/project_log.md` (цей запис).
+Рішення, які ухвалено: лише перейменування й уточнення документації та тестів, нових функцій немає. Пошук по репозиторію: згадок `Correct.solved` в `app/` немає (`app` сесію не використовує); решта збігів слова `solved` це `PuzzleState.SOLVED`, `PuzzleStats.solved`, тексти й журнал.
+Що передати далі (кому і що): Android і UI: використовуйте `lineCompleted` і результат із `state`. Запит Архітектора (а) з сесії 16 виконано; (б) назви тем чекають рішення власника, (в) схема уроків пізніше.
+Відкриті питання / блокери: без змін.
+Перевірено: `./gradlew build :learning:test` і `:learning:validateContent --require-verified` зелені.
+
 ### 2026-11-01 Архітектор (сесія 16)
 Що зроблено: перевірено, що PR #16 змінив серед `docs/` лише журнал (контракти цілі, v0.15); переглянуто `PuzzleSession` і `ContentLoader`; затверджено й записано в контракт шість уточнень Навчання і контент; перейменовано `Correct.solved` на `lineCompleted`; визначено режим завантаження контенту в застосунку й бюджет; спосіб другої версії схеми Room; пріоритет екрана задач.
 Що змінено (файли/модулі): `CONTRACTS.md` v0.15 → v0.16 (статус, перелік змін, 4.1, 5, 6.1); `THIRD_PARTY.md` v0.12 → v0.13 (SW-019); `project_log.md`.

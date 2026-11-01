@@ -21,9 +21,11 @@ import org.chesstrainer.learning.content.ThemeKind
  * - хід приймається, якщо збігається з наступним ходом `solution` або дає мат (альтернативний мат);
  *   інші ходи (і нелегальні) дають [PuzzleStep.Wrong], позиція не змінюється;
  * - після [PuzzleStep.Wrong], підказки [Hint.FullMove] стан стає [PuzzleState.FAILED], але гравець може
- *   доходити розв'язок до кінця ([PuzzleStep.Correct] із `solved = true` означає «лінію завершено»,
+ *   доходити розв'язок до кінця ([PuzzleStep.Correct] із `lineCompleted = true` означає «лінію завершено»,
  *   `state` лишається FAILED);
- * - [revealSolution] завершує сесію: далі кожен хід дає [PuzzleStep.Finished];
+ * - `lineCompleted` описує лише кінець лінії; результат задачі визначає [state] (SOLVED або FAILED);
+ * - [revealSolution] можна викликати будь-коли, вона дає FAILED і завершує сесію: далі кожен хід дає [PuzzleStep.Finished];
+ * - після кінця лінії хід теж дає [PuzzleStep.Finished];
  * - [position] це поточна позиція (на початку збігається з позицією з `startFen`), [startPosition] початкова;
  * - [hint] після завершення сесії кидає [IllegalStateException] (порушення контракту програмістом).
  *
@@ -89,13 +91,13 @@ class DefaultPuzzleSession(
         val replyMove = expectedMove(ply + 1)
         current = apply(current, replyMove)
         ply += 2
-        return PuzzleStep.Correct(replyMove, solved = false)
+        return PuzzleStep.Correct(replyMove, lineCompleted = false)
     }
 
     private fun finish(): PuzzleStep {
         completed = true
         finishedAtMs = elapsedMs()
-        return PuzzleStep.Correct(null, solved = true)
+        return PuzzleStep.Correct(null, lineCompleted = true)
     }
 
     override fun hint(): Hint {
