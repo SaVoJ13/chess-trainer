@@ -82,6 +82,8 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.room.testing)
+    // Лише debug (і через узгоджену резолюцію androidTest): Room 2.8.5 room-migration потребує serialization 1.8.1; release не зачіпається.
+    debugImplementation(libs.kotlinx.serialization.core)
 }
 
 // Room (SW-004): схема експортується з першої версії; кожна зміна схеми має міграцію й тест (CONTRACTS 5).
