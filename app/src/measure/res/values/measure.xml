@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+  SPDX-FileCopyrightText: 2026 Chess Trainer contributors
+-->
+<!-- Лише buildType `measure`: вмикає лог PuzzleContent у не-debuggable збірці. -->
+<resources>
+    <bool name="content_measure_log">true</bool>
+</resources>
