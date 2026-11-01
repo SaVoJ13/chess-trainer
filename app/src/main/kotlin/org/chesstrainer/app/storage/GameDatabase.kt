@@ -19,6 +19,7 @@ import androidx.room.migration.Migration
 @Database(entities = [GameEntity::class, PuzzleAttemptEntity::class], version = GameDatabase.VERSION, exportSchema = true)
 abstract class GameDatabase : RoomDatabase() {
     abstract fun games(): GameDao
+    abstract fun puzzleProgress(): PuzzleProgressDao
 
     companion object {
         const val VERSION = 2
