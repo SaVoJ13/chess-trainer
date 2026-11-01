@@ -20,7 +20,8 @@ import org.chesstrainer.learning.puzzle.DefaultPuzzleService
  */
 class PuzzleViewModel(application: Application) : AndroidViewModel(application) {
     private val rules = ChesslibRules()
-    private val debuggable = application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+    private val debuggable = (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) ||
+        measureLogEnabled(application)
 
     private val content = packedContentSource(
         opener = AssetOpener { path -> application.assets.open(path) },
@@ -48,6 +49,12 @@ class PuzzleViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         controller.start()
+    }
+
+    private fun measureLogEnabled(app: Application): Boolean {
+        // Ресурс задає лише buildType `measure` (app/build.gradle.kts); в інших збірках його немає.
+        val id = app.resources.getIdentifier("content_measure_log", "bool", app.packageName)
+        return id != 0 && app.resources.getBoolean(id)
     }
 
     private companion object {

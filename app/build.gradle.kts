@@ -47,6 +47,17 @@ android {
         debug {
             applicationIdSuffix = ".debug"
         }
+        // Лише для виміру ContentSource на телефоні: release-подібна (R8, не debuggable), підпис debug-ключем
+        // з локального ~/.android (ключ у репозиторій не потрапляє). Не для розповсюдження.
+        create("measure") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".measure"
+            isMinifyEnabled = true
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            matchingFallbacks += "release"
+        }
     }
 
     compileOptions {
