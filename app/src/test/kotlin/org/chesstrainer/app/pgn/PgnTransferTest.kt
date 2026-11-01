@@ -72,7 +72,7 @@ class PgnTransferTest {
 
     @Test
     fun cyrillicTagsAndByteOrderMarkSurvive() {
-        val (result, repo) = import("﻿" + ok)
+        val (result, repo) = import(0xFEFF.toChar() + ok)
         assertEquals(ImportResult.Done(1, emptyList()), result)
         assertTrue(repo.rows.single().pgn.contains("Партія A"))
     }

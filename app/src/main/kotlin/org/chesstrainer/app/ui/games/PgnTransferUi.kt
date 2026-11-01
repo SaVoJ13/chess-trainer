@@ -47,6 +47,7 @@ fun rememberPgnTransfer(viewModel: GamesViewModel): PgnTransferActions {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by viewModel.transfer.collectAsState()
+    val chooserTitle = stringResource(R.string.transfer_share_chooser)
 
     val openLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.importFrom(uri)
@@ -83,7 +84,7 @@ fun rememberPgnTransfer(viewModel: GamesViewModel): PgnTransferActions {
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 try {
-                                    context.startActivity(Intent.createChooser(send, context.getString(R.string.transfer_share_chooser)))
+                                    context.startActivity(Intent.createChooser(send, chooserTitle))
                                 } catch (e: ActivityNotFoundException) {
                                     // Немає застосунку для «Поділитися»: лишається збереження у файл.
                                 }

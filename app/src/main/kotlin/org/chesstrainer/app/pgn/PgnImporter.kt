@@ -55,7 +55,7 @@ class PgnImporter(
             return ImportResult.ReadError
         } ?: return ImportResult.TooLarge
         val parsed = try {
-            withContext(cpu) { parse(String(bytes, Charsets.UTF_8).removePrefix("﻿")) }
+            withContext(cpu) { parse(String(bytes, Charsets.UTF_8).removePrefix(BOM)) }
         } catch (e: RuntimeException) {
             return ImportResult.ReadError
         } ?: return ImportResult.TooMany
@@ -115,5 +115,8 @@ class PgnImporter(
         /** 2 МБ (CONTRACTS 5). */
         const val MAX_BYTES = 2 * 1024 * 1024
         const val MAX_GAMES = 500
+
+        /** Позначка порядку байтів (U+FEFF) на початку файлу, яку додають деякі редактори. */
+        private val BOM = 0xFEFF.toChar().toString()
     }
 }
