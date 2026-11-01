@@ -16,16 +16,17 @@ import androidx.room.migration.Migration
  * `app/schemas/.../<версія>.json` і тест міграції. Деструктивної міграції немає: вона знищила б партії.
  * `GameSchemaTest` перевіряє, що ці умови не порушено.
  */
-@Database(entities = [GameEntity::class], version = GameDatabase.VERSION, exportSchema = true)
+@Database(entities = [GameEntity::class, PuzzleAttemptEntity::class], version = GameDatabase.VERSION, exportSchema = true)
 abstract class GameDatabase : RoomDatabase() {
     abstract fun games(): GameDao
+    abstract fun puzzleProgress(): PuzzleProgressDao
 
     companion object {
-        const val VERSION = 1
+        const val VERSION = 2
         const val FILE_NAME = "games.db"
 
-        /** Міграції з версії N на N+1 по порядку; для версії 1 порожньо. */
-        val MIGRATIONS: List<Migration> = emptyList()
+        /** Міграції з версії N на N+1 по порядку: 1 → 2 додає таблицю прогресу задач, партії не зачіпаються. */
+        val MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2)
 
         fun create(context: Context): GameDatabase =
             Room.databaseBuilder(context.applicationContext, GameDatabase::class.java, FILE_NAME)
