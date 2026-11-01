@@ -79,7 +79,7 @@ class DifficultyPresetsTest {
 
     @Test
     fun `ids of a level do not depend on the capabilities`() {
-        val other = caps.copy(eloRange = 1000..2000, maxMultiPv = 10)
+        val other = caps.copy(eloRange = 1000..2000, maxMultiPv = 64)
         for (id in listOf(DifficultyIds.HANDICAP_3, DifficultyIds.ELO_1700, DifficultyIds.FULL)) {
             assertEquals(id, presets.byId(id, caps)?.id)
             assertEquals(id, presets.byId(id, other)?.id)
@@ -99,5 +99,23 @@ class DifficultyPresetsTest {
     @Test
     fun `unknown id gives null`() {
         assertNull(presets.byId(org.chesstrainer.core.engine.DifficultyId(1234), caps))
+    }
+
+    @Test
+    fun `handicap needs room for every legal move`() {
+        // Кандидати це всі легальні ходи (до 64): менше ліній у рушія означає, що частина ходів не кандидати.
+        assertEquals(64, HandicapEngineService.REQUIRED_MULTI_PV)
+        assertEquals(HandicapPolicy.MAX_CANDIDATES, HandicapEngineService.REQUIRED_MULTI_PV)
+        assertTrue(FakeEngineService.DEFAULT_CAPABILITIES.maxMultiPv >= HandicapEngineService.REQUIRED_MULTI_PV)
+    }
+
+    @Test
+    fun `handicap levels search to the profile depth and keep the profile delay`() {
+        val handicap = presets.levels(caps).filter { it.strength is Strength.Handicap }
+        for (level in handicap) {
+            val profile = HandicapPolicy.profile((level.strength as Strength.Handicap).step)
+            assertEquals(SearchLimit(depth = profile.searchDepth), level.limit)
+            assertEquals(profile.minReplyDelayMs, level.minReplyDelayMs)
+        }
     }
 }
