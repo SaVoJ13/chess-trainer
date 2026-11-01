@@ -178,6 +178,43 @@
 
 (додавайте нові записи зверху)
 
+### 2026-11-01 Android і UI (сесія 9, етап 2: екран задач, ContentSource, Room v2)
+
+Що зроблено:
+- `.gitattributes`: `content/common/** text eol=lf`.
+- `PackedContentSource` (app/content): читає `manifest.json` і `puzzles/*.json` з assets через `ContentLoader` (лише STRUCTURE) поза головним потоком, кешує в `InMemoryContentSource`. Незнайомий MAJOR, пошкоджений манифест чи відсутній файл дають `ContentStatus.Unavailable` (екран пояснює, застосунок не падає); пошкоджений пакет пропускається з проблемою. Вимір часу й утриманої пам'яті пишеться в logcat (тег `PuzzleContent`) лише в debuggable-збірці.
+- Room схема v2: таблиця `puzzle_attempts` (puzzleId, state, wrongMoves, hintsUsed, timeMs, at), `PuzzleProgressDao`, `RoomPuzzleProgressRepository`, міграція 1 → 2 (`games` не зачіпається), `app/schemas/.../2.json`, `GameDatabase.VERSION = 2`, без деструктивної міграції. Семантика: «остання спроба» задачі це запис з найбільшим `id`; `failedPuzzleIds` це задачі, чия остання спроба FAILED, у порядку цієї спроби (повторна помилка відправляє задачу в кінець черги); `stats()` рахує за останніми спробами (`attempted = solved + failed`). Запити звірено на локальному sqlite3 (на ПК).
+- Тести: `GameSchemaTest` (+ збіг SQL міграції з `2.json`), JVM-тест репозиторію на фейковому DAO, інструментовані `GameMigrationTest` і `PuzzleProgressDaoTest` (androidTest; `room-testing` 2.8.5, `androidx.test` runner 1.7.0 і ext:junit 1.3.0 лише в `androidTestImplementation`).
+- `THIRD_PARTY.md` (лише ці рядки): SW-019 доповнено перевіркою POM і версій 2026-11-01, новий SW-023 (`room-testing`), рядок у журналі перевірок. Обидва лишаються «Перевіряється» до проходження тесту міграції на телефоні.
+- Екран задач: `PuzzleController` (вся логіка, JVM-тести), `PuzzleViewModel`, `PuzzleScreen`; вхід кнопкою «Задачі» на екрані гри. Вибір теми (будь-яка + 20), рівня (Будь-яка / Легко до 1000 / Середньо 1000–1799 / Складно від 1800; слова «рейтинг Lichess» немає), режиму (нові / повторити помилки). Дошка: `ChessBoard`, хід за стороною з `startFen`, відповідь суперника з паузою 450 мс, неправильний хід не змінює позицію, три кроки підказки (тема, фігура, хід), «Показати розв'язок» з гортанням ходів (SAN), «Наступна задача», статистика на екрані вибору, зрозумілі стани «задачі закінчились» / «нема помилок» / «контент недоступний».
+- Підсумок береться з `PuzzleSession.state`, не з `lineCompleted`; кнопка підказки ховається після завершення. Запис спроби один раз (кінець лінії, показ розв'язку, вихід із задачі, що вже FAILED); вихід із чистої незавершеної задачі нічого не пише.
+- Рядки: `puzzle_theme_<id>` для 20 тем + решта в `values/` і `values-uk/` («Наскрізний удар», «Міттельшпіль»); тест на повноту й паритет мов.
+- CI: крок `./gradlew :app:assembleDebugAndroidTest` у job `assemble-debug`.
+
+Що змінено (файли/модулі): `.gitattributes`, `gradle/libs.versions.toml`, `app/build.gradle.kts`, `app/src/main/kotlin/.../{content,puzzle,storage,ui/puzzle,ui/AppNavigation,ui/game/GameScreen,MainActivity}`, `app/src/main/res/values*/strings.xml`, `app/schemas/.../2.json`, `app/src/{test,androidTest}`, `.github/workflows/ci.yml`, `docs/THIRD_PARTY.md` (SW-019, SW-023, журнал), цей запис. `:learning` і `:core-chess:*` не чіпали.
+
+Рішення, які ухвалено:
+- Рівні складності за межами контенту: Легко < 1000, Середньо 1000–1799, Складно ≥ 1800 (пакет має діапазони 400–999 / 1000–1399 / 1400–1799 / 1800–2199 / 2200+).
+- Сутності Room лишаються в `app`; DAO прогресу ділить той самий екземпляр бази з партіями (`GameStorage`).
+
+Перевірено (команди й результат):
+- `./gradlew build :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=2`: BUILD SUCCESSFUL (тести всіх модулів, lint, APK, APK androidTest `app-debug-androidTest.apk`).
+- `java scripts/ApiCompatCheck.java --apk app/build/outputs/apk/debug/app-debug.apk`: OK (0 порушень).
+- `./gradlew :learning:validateContent --args="--content content/common --registry docs/THIRD_PARTY.md --require-verified"`: OK, 4000 задач.
+- Злитий маніфест debug: `INTERNET` немає; єдиний `uses-permission` це автоматичний `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` від AndroidX; `sqlite-bundled` і `room-testing` у `debugRuntimeClasspath` відсутні.
+- Довідковий вимір на ПК (не бюджет): розбір 4000 задач ≈ 189 мс у JVM-тесті `committedPackLoadsAndReportsTiming`.
+
+**НЕ ВИКОНАНО, ЧЕКАЄ ТЕЛЕФОНА** (за вказівкою власника: телефон зайнятий іншим агентом, жодних adb/install/connected у цій сесії):
+1. Вимір ContentSource на SM-S928B (бюджет ≤ 300 мс, ≤ 15 МБ). Інструкція: у новому PowerShell `$env:PATH += ";$env:LOCALAPPDATA\Android\Sdk\platform-tools"`; `./gradlew :app:installDebug`; `adb -s RZCX326349A shell am force-stop org.chesstrainer.app.debug`; `adb -s RZCX326349A logcat -c`; запустити застосунок, відкрити «Задачі»; `adb -s RZCX326349A logcat -d -s PuzzleContent` дає рядок «loaded 4000 puzzles in N ms, retained heap K KiB». Повторити 5 разів (force-stop перед кожним) і записати медіану сюди. Якщо бюджет перевищено, запит Архітектору (ліниве завантаження / поділ на пакети).
+2. Тест міграції й DAO на телефоні: екран розблоковано, `./gradlew :app:connectedDebugAndroidTest` (тести `GameMigrationTest`, `PuzzleProgressDaoTest`). Результат записати сюди; після проходження Архітектор переводить SW-019 і SW-023 у «Перевірено» (CONTRACTS 5, v0.16). До цього PR не зливати.
+3. Ручна перевірка (SM-S928B): (а) вибір теми й складності, старт; (б) правильний хід і відповідь суперника; (в) помилковий хід (позиція не змінюється, повідомлення, у підсумку «з помилками»); (г) три підказки, після третьої хід підсвічено, задача FAILED; (д) «Показати розв'язок» і гортання ходів; (е) режим «Повторити помилки» (показані FAILED, порожній стан); (ж) статистика на екрані вибору росте; (з) закінчення нових задач за вузьким фільтром; (и) міграція: поставити збірку з `main` до цієї гілки (з кількома партіями), оновити поверх (`adb install -r`), партії на місці, задачі працюють; (к) uk і en, великий шрифт, TalkBack: цілі торкання ≥ 48 dp.
+
+Що передати далі:
+- Архітектору: перегляд моїх правок `THIRD_PARTY.md` (SW-019, SW-023, журнал) і чинної семантики `failedPuzzleIds` (за останньою спробою, а не за першою помилкою) для CONTRACTS 4.2; після тесту міграції на телефоні перевести SW-019/SW-023 у «Перевірено». Окремих запитів на зміну контрактів немає.
+- Власнику: п. 1–3 вище; пуш гілки `feature/puzzle-screen` виконує власник.
+
+Відкриті питання / блокери: вимір ContentSource і `connectedDebugAndroidTest` не виконано (телефон зайнятий); пауза відповіді суперника 450 мс і пороги рівнів (1000/1800) підібрані без перевірки на пристрої.
+
 ### 2026-11-01 Навчання і контент (сесія 3: PuzzleStep.Correct.solved → lineCompleted)
 Що зроблено: виконано запит Архітектора (CONTRACTS 4.1, v0.16): поле `PuzzleStep.Correct.solved` перейменовано на `lineCompleted` у `learning/` (тип, `DefaultPuzzleSession`, тести). Оновлено KDoc у `PuzzleStep.Correct`, `PuzzleSession.hint()`/`revealSolution()`, `DefaultPuzzleSession`, `LoadValidation` (у застосунку лише `STRUCTURE`, `FULL` для інструментів і тестів). Додано тести: `hint()` після завершення лінії кидає `IllegalStateException`; `Wrong` + кінець лінії = `FAILED` і `lineCompleted = true`; `revealSolution()` посеред задачі дає `FAILED` і далі `Finished`. Наявні тести (чисте розв'язання, `FullMove` + кінець лінії, альтернативний мат, `Finished` після завершення) лише перейменовані, не вимкнені.
 Що змінено (файли/модулі): `learning/src/main/…/puzzle/{PuzzleModel,DefaultPuzzleSession}.kt`, `…/content/ContentLoader.kt` (лише KDoc), тести `PuzzleSessionTest`, `ContentLoaderTest`; `docs/project_log.md` (цей запис).
