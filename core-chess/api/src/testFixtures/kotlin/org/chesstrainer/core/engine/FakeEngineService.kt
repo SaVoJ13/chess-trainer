@@ -243,7 +243,7 @@ class FakeEngineService(
             version = "0",
             eloRange = 1320..3190,
             skillLevelRange = 0..20,
-            maxMultiPv = 5,
+            maxMultiPv = 256,
             threadsMax = 4,
             hashMaxMb = 256,
         )

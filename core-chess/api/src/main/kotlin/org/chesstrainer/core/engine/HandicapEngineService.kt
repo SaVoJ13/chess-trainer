@@ -25,7 +25,8 @@ import org.chesstrainer.core.rules.ChessRules
  * Запит, відхилений до пошуку (`InvalidFen`, `IllegalMove`, `NoLegalMoves`), у рушій не потрапляє; лише коли
  * рушій зайнятий, йому передається той самий запит, щоб він скасував попередній пошук, як цього вимагає 3.4.
  *
- * [random] витрачається рівно двома киданнями на кожен успішно обраний хід Handicap.
+ * [random] витрачається `HandicapPolicy.drawsPerMove(step)` киданнями (фіксоване число для кроку) на кожен успішно
+ * обраний хід Handicap.
  */
 class HandicapEngineService(
     private val delegate: EngineService,
@@ -45,11 +46,11 @@ class HandicapEngineService(
         val handicap = request.level.strength as? Strength.Handicap ?: return delegate.bestMove(request)
         HandicapPolicy.profile(handicap.step) // IllegalArgumentException для кроку поза діапазоном: до прийняття запиту
 
-        val lines = minOf(HandicapPolicy.CANDIDATES, capabilities?.maxMultiPv ?: HandicapPolicy.CANDIDATES)
-        val analysis = AnalysisRequest(request.startFen, request.moves, request.level.limit, lines)
+        val maxLines = minOf(HandicapPolicy.MAX_CANDIDATES, capabilities?.maxMultiPv ?: HandicapPolicy.MAX_CANDIDATES)
+        var analysis = AnalysisRequest(request.startFen, request.moves, request.level.limit, maxLines)
 
         val running = delegate.state.value.let { it == EngineState.Ready || it == EngineState.Busy }
-        if (!running) return search(analysis, expectedLines = lines).asError() // EngineUnavailable від рушія
+        if (!running) return search(analysis, expectedLines = maxLines).asError() // EngineUnavailable від рушія
 
         val position = when (val parsed = positionAfter(request.startFen, request.moves)) {
             is ChessResult.Ok -> parsed.value
@@ -58,22 +59,20 @@ class HandicapEngineService(
         val legal = rules.legalMoves(position)
         if (legal.isEmpty()) return rejected(analysis, ChessError.NoLegalMoves)
 
-        val updates = when (val found = search(analysis, expectedLines = minOf(lines, legal.size))) {
+        // Кандидати це всі легальні ходи (але не більше за MultiPV рушія й MAX_CANDIDATES).
+        val lines = minOf(legal.size, maxLines)
+        analysis = analysis.copy(multiPv = lines)
+        val updates = when (val found = search(analysis, expectedLines = lines)) {
             is SearchResult.Lines -> found.updates
             is SearchResult.Error -> return ChessResult.Err(found.error)
         }
-        val candidates = updates.mapNotNull { candidateOf(it, position) }
+        val candidates = updates.mapNotNull { candidateOf(rules, it, position) }
         // Кидання витрачаються завжди, навіть коли кандидат один: однакова кількість викликів Random на хід.
-        val blindDraw: Double
-        val pickDraw: Double
-        synchronized(random) {
-            blindDraw = random.nextDouble()
-            pickDraw = random.nextDouble()
-        }
+        val draws = synchronized(random) { List(HandicapPolicy.drawsPerMove(handicap.step)) { random.nextDouble() } }
         if (candidates.isEmpty()) {
             return ChessResult.Err(ChessError.EngineCrashed("engine returned no usable candidate moves"))
         }
-        val best = HandicapPolicy.choose(candidates, handicap.step, blindDraw, pickDraw)
+        val best = HandicapPolicy.choose(candidates, handicap.step, draws)
         return ChessResult.Ok(EngineMove(best, ponder = null))
     }
 
@@ -116,23 +115,6 @@ class HandicapEngineService(
         return SearchResult.Lines(complete.toSortedMap().values.toList())
     }
 
-    private fun candidateOf(update: AnalysisUpdate, position: Position): HandicapCandidate? {
-        val first = update.pv.firstOrNull() ?: return null
-        if (rules.parseUci(position, first.value) !is ChessResult.Ok) return null
-        return HandicapCandidate(first, moverScore(update.evaluation, position.sideToMove))
-    }
-
-    /** Оцінка рушія (з погляду білих) з погляду сторони, що ходить; мат у N ходів це `MATE_CP − 10·N`. */
-    private fun moverScore(evaluation: Evaluation, mover: Color): Int {
-        val white = when (evaluation) {
-            is Evaluation.Centipawns -> evaluation.cp
-            is Evaluation.Mate -> {
-                val magnitude = HandicapPolicy.MATE_CP - minOf(kotlin.math.abs(evaluation.moves), 100) * 10
-                if (evaluation.moves > 0) magnitude else -magnitude
-            }
-        }
-        return (if (mover == Color.WHITE) white else -white).coerceIn(-HandicapPolicy.MATE_CP, HandicapPolicy.MATE_CP)
-    }
 
     private fun positionAfter(startFen: Fen, moves: List<Uci>): ChessResult<Position> {
         var position = when (val parsed = rules.parseFen(startFen.value)) {
@@ -153,7 +135,26 @@ class HandicapEngineService(
     }
 
     companion object {
+        /** Лінія рушія → кандидат: перший хід PV, якщо він легальний у [position]; оцінка з погляду сторони, що ходить. */
+        internal fun candidateOf(rules: ChessRules, update: AnalysisUpdate, position: Position): HandicapCandidate? {
+            val first = update.pv.firstOrNull() ?: return null
+            if (rules.parseUci(position, first.value) !is ChessResult.Ok) return null
+            return HandicapCandidate(first, moverScore(update.evaluation, position.sideToMove))
+        }
+
+        /** Оцінка рушія (з погляду білих) з погляду сторони, що ходить; мат у N ходів це `MATE_CP − 10·N`. */
+        internal fun moverScore(evaluation: Evaluation, mover: Color): Int {
+            val white = when (evaluation) {
+                is Evaluation.Centipawns -> evaluation.cp
+                is Evaluation.Mate -> {
+                    val magnitude = HandicapPolicy.MATE_CP - minOf(kotlin.math.abs(evaluation.moves), 100) * 10
+                    if (evaluation.moves > 0) magnitude else -magnitude
+                }
+            }
+            return (if (mover == Color.WHITE) white else -white).coerceIn(-HandicapPolicy.MATE_CP, HandicapPolicy.MATE_CP)
+        }
+
         /** Мінімум `capabilities.maxMultiPv`, за якого пресети пропонують рівні Handicap. */
-        const val REQUIRED_MULTI_PV: Int = HandicapPolicy.CANDIDATES
+        const val REQUIRED_MULTI_PV: Int = HandicapPolicy.MAX_CANDIDATES
     }
 }
