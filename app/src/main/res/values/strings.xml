@@ -147,7 +147,7 @@
     <string name="review_load_failed">This game cannot be shown.</string>
 
     <!-- PGN import and export -->
-    <string name="transfer_importing">Importing…</string>
+    <string name="transfer_busy">Working…</string>
     <string name="transfer_import_title">Import finished</string>
     <string name="transfer_import_summary">Imported: %1$d, skipped: %2$d.</string>
     <string name="transfer_import_skipped">Skipped games (their numbers in the file): %1$s.</string>

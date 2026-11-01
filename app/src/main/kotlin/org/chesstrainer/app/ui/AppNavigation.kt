@@ -17,11 +17,23 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import org.chesstrainer.app.game.GameController
 import org.chesstrainer.app.review.GamesViewModel
+import org.chesstrainer.app.review.ReviewSlot
 import org.chesstrainer.app.storage.GameId
 import org.chesstrainer.app.storage.GameMode
 import org.chesstrainer.app.ui.game.GameScreen
 import org.chesstrainer.app.ui.games.GamesScreen
 import org.chesstrainer.app.ui.games.ReviewScreen
+import org.chesstrainer.app.ui.games.rememberPgnTransfer
+import org.chesstrainer.app.pgn.ExportSelection
+import org.chesstrainer.app.R
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 
 private enum class Screen { GAME, GAMES, REVIEW }
 
@@ -35,6 +47,7 @@ fun AppNavigation(controller: GameController, games: GamesViewModel) {
     var reviewId by rememberSaveable { mutableLongStateOf(0L) }
     var openFailed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val transfer = rememberPgnTransfer(games)
 
     BackHandler(enabled = screen != Screen.GAME) {
         screen = if (screen == Screen.REVIEW) Screen.GAMES else Screen.GAME
@@ -59,6 +72,19 @@ fun AppNavigation(controller: GameController, games: GamesViewModel) {
                         screen = Screen.REVIEW
                     }
                 },
+                onExport = { id -> transfer.export(ExportSelection.One(id)) },
+                headerActions = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = transfer.importFile, modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.games_action_import))
+                        }
+                        TextButton(
+                            onClick = { transfer.export(ExportSelection.All) },
+                            enabled = !list.isNullOrEmpty(),
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) { Text(stringResource(R.string.games_action_export_all)) }
+                    }
+                },
                 onDelete = { id ->
                     scope.launch { if (games.delete(id)) controller.onActiveGameDeleted() }
                 },
@@ -67,7 +93,17 @@ fun AppNavigation(controller: GameController, games: GamesViewModel) {
         Screen.REVIEW -> {
             LaunchedEffect(reviewId) { games.openReview(GameId(reviewId)) }
             val slot by games.review.collectAsState()
-            ReviewScreen(slot = slot, onBack = { screen = Screen.GAMES })
+            ReviewScreen(
+                slot = slot,
+                onBack = { screen = Screen.GAMES },
+                headerActions = {
+                    TextButton(
+                        onClick = { transfer.export(ExportSelection.One(GameId(reviewId))) },
+                        enabled = slot is ReviewSlot.Ready,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) { Text(stringResource(R.string.games_action_export)) }
+                },
+            )
         }
     }
 }
