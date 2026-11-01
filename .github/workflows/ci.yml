@@ -83,6 +83,9 @@ jobs:
           key: nnue-${{ hashFiles('core-chess/engine-android/build.gradle.kts') }}
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew :app:assembleDebug
+      # Інструментовані тести (тест міграції Room, CONTRACTS 5 v0.16) у CI лише компілюються: пристрою немає.
+      # Запуск `:app:connectedDebugAndroidTest` виконується на телефоні власника перед злиттям.
+      - run: ./gradlew :app:assembleDebugAndroidTest
       # Статична перевірка байткоду на API вище minSdk 26 (CONTRACTS 7.2). Потрібні JDK 17+, ANDROID_HOME
       # (platforms/android-*/data/api-versions.xml, build-tools/*/dexdump); без залежностей.
       # Код виходу 1 (є порушення) або 2 (помилка запуску) валить збірку.

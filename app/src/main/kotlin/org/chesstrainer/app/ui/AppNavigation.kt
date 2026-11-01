@@ -20,7 +20,9 @@ import org.chesstrainer.app.review.GamesViewModel
 import org.chesstrainer.app.review.ReviewSlot
 import org.chesstrainer.app.storage.GameId
 import org.chesstrainer.app.storage.GameMode
+import org.chesstrainer.app.puzzle.PuzzleController
 import org.chesstrainer.app.ui.game.GameScreen
+import org.chesstrainer.app.ui.puzzle.PuzzleScreen
 import org.chesstrainer.app.ui.games.GamesScreen
 import org.chesstrainer.app.ui.games.ReviewScreen
 import org.chesstrainer.app.ui.games.rememberPgnTransfer
@@ -35,14 +37,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
-private enum class Screen { GAME, GAMES, REVIEW }
+private enum class Screen { GAME, GAMES, REVIEW, PUZZLES }
 
 /**
- * Мінімальна навігація без окремої бібліотеки: три екрани, назад повертає на попередній. Стан екрана гри
+ * Мінімальна навігація без окремої бібліотеки: чотири екрани (гра, партії, перегляд, задачі), назад повертає на попередній. Стан екрана гри
  * тримає [GameController], тому перехід на список і назад його не губить.
  */
 @Composable
-fun AppNavigation(controller: GameController, games: GamesViewModel) {
+fun AppNavigation(controller: GameController, games: GamesViewModel, puzzles: () -> PuzzleController) {
     var screen by rememberSaveable { mutableStateOf(Screen.GAME) }
     var reviewId by rememberSaveable { mutableLongStateOf(0L) }
     var openFailed by remember { mutableStateOf(false) }
@@ -54,7 +56,13 @@ fun AppNavigation(controller: GameController, games: GamesViewModel) {
     }
 
     when (screen) {
-        Screen.GAME -> GameScreen(controller, onOpenGames = { screen = Screen.GAMES })
+        Screen.GAME -> GameScreen(
+            controller,
+            onOpenGames = { screen = Screen.GAMES },
+            onOpenPuzzles = { screen = Screen.PUZZLES },
+        )
+        // Контролер задач створюється (і контент читається) лише при першому вході на екран.
+        Screen.PUZZLES -> PuzzleScreen(puzzles(), onBack = { screen = Screen.GAME })
         Screen.GAMES -> {
             val list by games.games.collectAsState()
             GamesScreen(

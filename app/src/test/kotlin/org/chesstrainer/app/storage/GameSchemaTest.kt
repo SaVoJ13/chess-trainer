@@ -10,8 +10,8 @@ import org.junit.Test
 
 /**
  * Охоронець правила «кожна зміна схеми має міграцію й тест» (CONTRACTS 5, SW-004) для JVM-збірки без пристрою.
- * Саму міграцію на SQLite виконує лише ручна перевірка на пристрої (журнал): `room-testing` потребує
- * інструментованих тестів, а `androidx.test` у MVP не підключається (SW-019).
+ * Саму міграцію на SQLite виконує інструментований тест `GameMigrationTest` (androidTest, запускається на телефоні,
+ * CONTRACTS 5, v0.16); тут стережемо структуру: експорт схем, ланцюжок міграцій і збіг SQL міграції з `2.json`.
  *
  * Тест падає, якщо версію бази піднято без експортованої схеми, без ланцюжка міграцій або якщо схему
  * вже випущеної версії змінено.
@@ -58,5 +58,29 @@ class GameSchemaTest {
             assertTrue("у схемі v1 немає стовпця $it", text.contains("\"columnName\": \"$it\""))
         }
         assertTrue("схема v1 не має бути змінена після випуску", text.contains("\"tableName\": \"games\""))
+    }
+
+    @Test
+    fun versionTwoAddsPuzzleAttemptsAndKeepsGames() {
+        val text = File(schemaDir, "2.json").readText()
+        listOf("puzzleId", "state", "wrongMoves", "hintsUsed", "timeMs", "at").forEach {
+            assertTrue("у схемі v2 немає стовпця $it", text.contains("\"columnName\": \"$it\""))
+        }
+        // Таблиця партій у v2 не змінилась відносно v1.
+        assertEquals(createSqlOf(File(schemaDir, "1.json").readText(), "games"), createSqlOf(text, "games"))
+    }
+
+    @Test
+    fun migrationSqlMatchesExportedVersionTwoSchema() {
+        val text = File(schemaDir, "2.json").readText()
+        assertEquals(createSqlOf(text, "puzzle_attempts"), PuzzleAttemptsSql.CREATE_TABLE)
+        val index = Regex(""""createSql"\s*:\s*"(CREATE INDEX[^"]*puzzle_attempts[^"]*)"""").find(text)!!.groupValues[1]
+        assertEquals(index.replace("\${TABLE_NAME}", "puzzle_attempts"), PuzzleAttemptsSql.CREATE_INDEX)
+    }
+
+    /** SQL створення таблиці з експортованої схеми, де `${TABLE_NAME}` підставлено іменем таблиці. */
+    private fun createSqlOf(schema: String, table: String): String {
+        val entity = Regex(""""tableName"\s*:\s*"$table",\s*"createSql"\s*:\s*"([^"]*)"""").find(schema)!!
+        return entity.groupValues[1].replace("\${TABLE_NAME}", table)
     }
 }

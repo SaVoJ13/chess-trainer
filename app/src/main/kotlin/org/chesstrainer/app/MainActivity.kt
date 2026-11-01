@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import org.chesstrainer.app.game.GameViewModel
+import org.chesstrainer.app.puzzle.PuzzleViewModel
 import org.chesstrainer.app.review.GamesViewModel
 import org.chesstrainer.app.ui.AppNavigation
 import org.chesstrainer.app.ui.theme.ChessTheme
@@ -20,6 +21,7 @@ import org.chesstrainer.app.ui.theme.ChessTheme
 class MainActivity : ComponentActivity() {
     private val viewModel: GameViewModel by viewModels()
     private val gamesViewModel: GamesViewModel by viewModels()
+    private val puzzleViewModel: PuzzleViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,7 +29,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             ChessTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppNavigation(viewModel.controller, gamesViewModel)
+                    AppNavigation(viewModel.controller, gamesViewModel, puzzles = { puzzleViewModel.controller })
                 }
             }
         }

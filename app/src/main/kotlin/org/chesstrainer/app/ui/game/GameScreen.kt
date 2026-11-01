@@ -84,7 +84,7 @@ private val MinTouch = 48.dp
 
 /** Екран гри «людина проти рушія». */
 @Composable
-fun GameScreen(controller: GameController, onOpenGames: () -> Unit = {}) {
+fun GameScreen(controller: GameController, onOpenGames: () -> Unit = {}, onOpenPuzzles: () -> Unit = {}) {
     val state by controller.state.collectAsState()
     var dialog by rememberSaveable { mutableStateOf(GameDialog.NONE) }
 
@@ -98,7 +98,7 @@ fun GameScreen(controller: GameController, onOpenGames: () -> Unit = {}) {
                     StatusLine(state)
                     Notices(state, controller)
                     MoveList(state, vertical = true, modifier = Modifier.weight(1f).fillMaxWidth())
-                    ActionButtons(state, controller, onOpenGames, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
+                    ActionButtons(state, controller, onOpenGames, onOpenPuzzles, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
                 }
             }
         } else {
@@ -113,7 +113,7 @@ fun GameScreen(controller: GameController, onOpenGames: () -> Unit = {}) {
                 Notices(state, controller)
                 MoveList(state, vertical = false, modifier = Modifier.fillMaxWidth().height(44.dp))
                 Spacer(Modifier.weight(1f))
-                ActionButtons(state, controller, onOpenGames, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
+                ActionButtons(state, controller, onOpenGames, onOpenPuzzles, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
             }
         }
     }
@@ -318,6 +318,7 @@ private fun ActionButtons(
     state: GameUiState,
     controller: GameController,
     onOpenGames: () -> Unit,
+    onOpenPuzzles: () -> Unit,
     onResign: () -> Unit,
     onNewGame: () -> Unit,
 ) {
@@ -328,6 +329,7 @@ private fun ActionButtons(
             ActionButton(R.string.games_action_open, enabled = true, onClick = onOpenGames)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ActionButton(R.string.puzzle_action_open, enabled = true, onClick = onOpenPuzzles)
             ActionButton(R.string.game_action_resign, enabled = !state.isOver, onClick = onResign)
             ActionButton(R.string.game_action_new_game, enabled = true, primary = true, onClick = onNewGame)
         }
@@ -469,7 +471,7 @@ private fun LevelList(
 }
 
 @Composable
-private fun PromotionDialog(color: ChessColor, onChoose: (PieceType) -> Unit, onDismiss: () -> Unit) {
+internal fun PromotionDialog(color: ChessColor, onChoose: (PieceType) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.game_promotion_title)) },
