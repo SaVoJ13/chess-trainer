@@ -56,6 +56,11 @@ class UciProcessEngine(
     override var capabilities: EngineCapabilities? = null
         private set
 
+    /** Вузли останнього `bestMove` (останній рядок `info nodes`): для перерахунку часу пресета у вузли. */
+    @Volatile
+    var lastNodes: Long = 0
+        private set
+
     private var process: Process? = null
     private var writer: BufferedWriter? = null
     private var reader: BufferedReader? = null
@@ -101,6 +106,11 @@ class UciProcessEngine(
         return ChessResult.Ok(Unit)
     }
 
+    /** Аварійно обриває процес (сторож матчів): заблокований `readLine` поверне `null`. */
+    fun kill() {
+        process?.destroyForcibly()
+    }
+
     override suspend fun stop() {
         runCatching { send("quit") }
         process?.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
@@ -141,6 +151,9 @@ class UciProcessEngine(
             send("go ${limitCommand(request.level.limit)}")
             while (true) {
                 val line = readLine() ?: return ChessResult.Err(ChessError.EngineCrashed("Stockfish exited"))
+                if (line.startsWith("info ") && " nodes " in line) {
+                    line.substringAfter(" nodes ").substringBefore(' ').toLongOrNull()?.let { lastNodes = it }
+                }
                 if (line.startsWith("bestmove ")) {
                     val parts = line.split(' ')
                     return ChessResult.Ok(EngineMove(Uci(parts[1]), parts.getOrNull(3)?.let { Uci(it) }))
@@ -287,15 +300,15 @@ class UciProcessEngine(
  * Кеш пошуків на диску (TSV, дописування). Запис зберігає лише лінії найглибшої повної ітерації, тож живий пошук
  * і відповідь із кешу однакові. `nodes` і `ms` це вартість пошуку при створенні запису (для оцінки часу ходу).
  */
-class AnalysisCache(private val file: File) {
+class AnalysisCache(private val file: File?, private val retain: Boolean = true) {
     data class Entry(val lines: List<AnalysisUpdate>, val nodes: Long, val ms: Long)
 
     private val map = ConcurrentHashMap<String, Entry>()
     private val lock = Any()
 
     init {
-        file.parentFile?.mkdirs()
-        if (file.isFile) file.forEachLine { line -> decode(line)?.let { (k, e) -> map[k] = e } }
+        file?.parentFile?.mkdirs()
+        if (file != null && file.isFile) file.forEachLine { line -> decode(line)?.let { (k, e) -> map[k] = e } }
     }
 
     val size: Int get() = map.size
@@ -304,8 +317,8 @@ class AnalysisCache(private val file: File) {
     fun get(key: String): Entry? = map[key]
 
     fun put(key: String, entry: Entry) {
-        map[key] = entry
-        synchronized(lock) { file.appendText(encode(key, entry) + "\n") }
+        if (retain) map[key] = entry
+        if (file != null) synchronized(lock) { file.appendText(encode(key, entry) + "\n") }
     }
 
     private fun encode(key: String, e: Entry): String {

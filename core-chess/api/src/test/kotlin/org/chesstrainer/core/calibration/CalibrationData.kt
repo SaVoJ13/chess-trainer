@@ -42,7 +42,7 @@ class CalibrationEnv(val root: File) {
     /** Консольний Stockfish на телефоні власника (збирає `build-stockfish-android.sh`), UCI через `adb shell -T`. */
     private val remoteDir = "/data/local/tmp/chess-calib"
     val netPath = "$remoteDir/nn-1a298aa575a0.nnue"
-    private val launch: List<String> = run {
+    internal val launch: List<String> = run {
         val props = java.util.Properties().also { p -> File(root, "local.properties").inputStream().use { p.load(it) } }
         val adb = File(props.getProperty("sdk.dir"), "platform-tools/adb.exe")
         check(adb.isFile) { "Немає adb: ${adb.path}" }
@@ -55,7 +55,7 @@ class CalibrationEnv(val root: File) {
         listOf(adb.path, "-s", serial, "shell", "-T", "$remoteDir/stockfish")
     }
     val rules: ChessRules = ChesslibRules()
-    val cache = AnalysisCache(File(data, "analysis.tsv"))
+    val cache by lazy { AnalysisCache(File(data, "analysis.tsv")) } // 40+ МБ: матчі її не чіпають
     private val engines = ConcurrentLinkedQueue<UciProcessEngine>()
 
     init {
@@ -63,10 +63,10 @@ class CalibrationEnv(val root: File) {
     }
 
     /** Запуск через adb іноді спорадично падає під навантаженням, тому кілька спроб. */
-    fun newEngine(): UciProcessEngine {
+    fun newEngine(engineCache: AnalysisCache = cache): UciProcessEngine {
         var last: Throwable? = null
         repeat(8) { attempt ->
-            val engine = UciProcessEngine(launch, netPath, rules, cache)
+            val engine = UciProcessEngine(launch, netPath, rules, engineCache)
             try {
                 runBlocking { engine.start() }
                 engines += engine
