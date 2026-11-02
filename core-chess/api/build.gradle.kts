@@ -69,3 +69,15 @@ tasks.register<JavaExec>("handicapMeasure") {
     workingDir = rootProject.projectDir
     maxHeapSize = "1g"
 }
+
+// Матчі калібрування Handicap на справжньому Stockfish (CONTRACTS 3.5 п. 8–9). Лише на ПК власника з телефоном
+// (adb): див. `core-chess/api/HANDICAP.md`, розд. 8. Не входить у `build`/`test`/CI.
+// Приклад: ./gradlew :core-chess:api:handicapMatch --args="run --dir full --games 144"
+tasks.register<JavaExec>("handicapMatch") {
+    description = "Матчі калібрування Handicap (лише ПК + телефон; докладніше: core-chess/api/HANDICAP.md)"
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("org.chesstrainer.core.calibration.HandicapMatchKt")
+    workingDir = rootProject.projectDir
+    maxHeapSize = "2g"
+}
