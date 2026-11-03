@@ -52,7 +52,7 @@ fun main(args: Array<String>) {
     val env = CalibrationEnv(CalibrationEnv.findRoot())
     try {
         when (command) {
-            "nodes" -> MatchTool.eloNodes(env)
+            "nodes" -> MatchTool.eloNodes(env, opts["elo"]?.toInt() ?: 1320)
             "run" -> MatchTool.run(env, opts)
             "report" -> println(MatchTool.report(MatchTool.runDir(env, opts)))
             else -> error("Невідома команда $command")
@@ -62,8 +62,22 @@ fun main(args: Array<String>) {
     }
 }
 
-/** Учасник: `H1..H5` (крок Handicap) або `E` (мінімальний `UCI_Elo`). */
-private fun sideName(side: String, elo: Int) = when (side) { "E" -> "UCI_Elo $elo"; "R" -> "випадковий"; else -> "Крок ${side.substring(1)}" }
+/** Учасник: `H1..H5` (крок Handicap), `E1320`/`E1500`/`E1700` (`UCI_Elo`; `E` = `E1320`), `R` (випадковий хід). */
+private fun sideName(side: String) = when {
+    side == "E" -> "UCI_Elo 1320"
+    side.startsWith("E") -> "UCI_Elo ${side.substring(1)}"
+    side == "R" -> "випадковий"
+    else -> "Крок ${side.substring(1, 2)}"
+}
+
+/** Рівні `UCI_Elo`, доступні в матчах: значення -> `DifficultyId` пресета. */
+private val ELO_SIDES = linkedMapOf(1320 to DifficultyIds.ELO_MIN, 1500 to DifficultyIds.ELO_1500, 1700 to DifficultyIds.ELO_1700)
+
+private fun eloOf(side: String): Int? = when {
+    side == "E" -> 1320
+    side.startsWith("E") -> side.substring(1).toIntOrNull()
+    else -> null
+}
 
 /** Пара: (очікувано сильніший, слабший). Правило сесій 18–19: 1–2, 2–3, 3–4, 4–5 і «крок 5 проти мін. UCI_Elo». */
 private val ALL_PAIRS: Map<String, Pair<String, String>> = linkedMapOf(
@@ -77,7 +91,18 @@ private val ALL_PAIRS: Map<String, Pair<String, String>> = linkedMapOf(
     "1-R" to ("H1" to "R"),
     "5-5" to ("H5" to "H5b"),
     "5-1" to ("H5" to "H1"),
+    // Матчі-локатори (CONTRACTS v0.19, 3.5 п. 8): хто сильніший, заздалегідь невідомо; перша сторона лише мітка,
+    // очки рахуються за міткою сторони, без порогу.
+    "E1320-1" to ("E1320" to "H1"),
+    "E1320-2" to ("E1320" to "H2"),
+    "E1320-3" to ("E1320" to "H3"),
+    "E1320-4" to ("E1320" to "H4"),
+    "E1500-5" to ("E1500" to "H5"),
+    "E1700-5" to ("E1700" to "H5"),
+    "E1500-E1320" to ("E1500" to "E1320"),
 )
+
+private val LOCATOR_PAIRS = setOf("E1320-1", "E1320-2", "E1320-3", "E1320-4", "E1500-5", "E1700-5", "E1500-E1320")
 
 private val DEFAULT_PAIRS = listOf("1-2", "2-3", "3-4", "4-5", "E-5")
 
@@ -187,11 +212,11 @@ internal object MatchTool {
 
     private fun nodesFile(env: CalibrationEnv) = File(matchesDir(env), "elo_nodes.txt")
 
-    fun eloNodes(env: CalibrationEnv) {
+    fun eloNodes(env: CalibrationEnv, elo: Int) {
         lockReminder(env, 60)
         val presets = DefaultDifficultyPresets()
         val engine = env.newEngine(AnalysisCache(null, retain = false))
-        val level = presets.byId(DifficultyIds.ELO_MIN, engine.capabilities!!)!!
+        val level = presets.byId(ELO_SIDES[elo] ?: error("Немає пресета UCI_Elo $elo (є ${ELO_SIDES.keys})"), engine.capabilities!!)!!
         val ms = level.limit.moveTimeMs ?: error("пресет мін. UCI_Elo без ліміту в часі")
         val games = Games(env).load()
         val fens = games.flatMap { g -> (10..minOf(50, g.moves.size - 1) step 2).map { Games(env).fenAt(g, it) } }
@@ -209,14 +234,16 @@ internal object MatchTool {
             "min=${nodes.first()} median=$median mean=$mean max=${nodes.last()} nps_median=${median * 1000 / ms} " +
             "temp_before=${b0?.tempC} temp_after=${b1?.tempC} nodesLimit=$median"
         println(text)
-        nodesFile(env).writeText(text + "\n")
+        val kept = nodesFile(env).takeIf { it.isFile }?.readLines()?.filter { it.isNotBlank() && !it.startsWith("elo=$elo ") }.orEmpty()
+        nodesFile(env).writeText((kept + text).joinToString("\n") + "\n")
         println("Записано ${nodesFile(env)}. Ліміт для матчів: $median вузлів (медіана вузлів за $ms мс).")
     }
 
-    private fun eloNodesLimit(env: CalibrationEnv): Long {
+    private fun eloNodesLimit(env: CalibrationEnv, elo: Int): Long {
         val f = nodesFile(env)
-        check(f.isFile) { "Немає ${f.path}: спершу команда `nodes`" }
-        return f.readText().substringAfter("nodesLimit=").trim().toLong()
+        check(f.isFile) { "Немає ${f.path}: спершу команда `nodes --elo $elo`" }
+        val line = f.readLines().firstOrNull { it.startsWith("elo=$elo ") } ?: error("Немає вузлів для UCI_Elo $elo: спершу `nodes --elo $elo`")
+        return line.substringAfter("nodesLimit=").trim().toLong()
     }
 
     // ---------------------------------------------------------------- матчі
@@ -230,12 +257,14 @@ internal object MatchTool {
         opts["trace"]?.let { traceFile = File(dir, "trace.tsv"); traceGames = it.toInt() }
         val pairKeys = (opts["pairs"] ?: DEFAULT_PAIRS.joinToString(",")).split(',').map { it.trim() }
         pairKeys.forEach { require(it in ALL_PAIRS) { "Невідома пара $it (є ${ALL_PAIRS.keys})" } }
-        val nodes = eloNodesLimit(env)
+        val usedElos = pairKeys.flatMap { ALL_PAIRS.getValue(it).toList() }.mapNotNull { eloOf(it) }.distinct().sorted()
+        val nodesByElo = usedElos.associateWith { eloNodesLimit(env, it) }
         val presets = DefaultDifficultyPresets()
         val probe = env.newEngine(AnalysisCache(null, retain = false))
         val caps = probe.capabilities!!
-        val eloLevel = presets.byId(DifficultyIds.ELO_MIN, caps)!!.let { it.copy(limit = SearchLimit(nodes = nodes)) }
-        val eloValue = (eloLevel.strength as org.chesstrainer.core.engine.Strength.Elo).elo
+        val eloLevels = usedElos.associateWith { elo ->
+            presets.byId(ELO_SIDES.getValue(elo), caps)!!.let { it.copy(limit = SearchLimit(nodes = nodesByElo.getValue(elo))) }
+        }
         val handicapLevels = (1..HandicapPolicy.STEPS).associate { "H$it" to presets.byId(DifficultyIds.all[it - 1], caps)!! }
         runBlocking { probe.stop() }
 
@@ -244,7 +273,7 @@ internal object MatchTool {
             appendLine("engine=${AnalysisCache.ENGINE_TAG}")
             appendLine("seed=$seed")
             appendLine("maxPlies=$maxPlies")
-            appendLine("eloNodes=$nodes eloUci=$eloValue")
+            nodesByElo.forEach { (elo, n) -> appendLine("eloNodes=$n eloUci=$elo") }
             handicapLevels.forEach { (k, l) ->
                 appendLine("$k=${HandicapPolicy.profile(k.substring(1).toInt())} limit=${l.limit}")
             }
@@ -277,6 +306,7 @@ internal object MatchTool {
                     lastBatteryRef.set(b)
                     batteryLog.appendText("${java.time.Instant.now()}\t${b.tempC}\t${b.level}\t${if (b.charging) "ext" else "bat"}\n")
                 }
+                memLog(dir)
                 try { Thread.sleep(60_000) } catch (e: InterruptedException) { return@Thread }
             }
         }.also { it.isDaemon = true; it.start() }
@@ -310,7 +340,7 @@ internal object MatchTool {
                         try {
                             val e = engine ?: env.newEngine(AnalysisCache(null, retain = false)).also { engine = it; engines[w] = it }
                             val rec = playGame(
-                                env, factory, e, pairKey, g, strong, weak, handicapLevels, eloLevel, seed, maxPlies,
+                                env, factory, e, pairKey, g, strong, weak, handicapLevels, eloLevels, seed, maxPlies,
                                 lastBatteryRef.get()?.tempC?.toString() ?: "?", activity[w],
                             )
                             synchronized(resultLock) { resultsFile.appendText(rec.line() + "\n") }
@@ -337,12 +367,40 @@ internal object MatchTool {
         } finally {
             pool.shutdownNow(); monitor.interrupt(); watchdog.interrupt()
         }
+        memLog(dir)
+        println(memSummary(dir))
         println(report(dir))
+    }
+
+    /** Пам'ять процесу JVM (перевірка виправлення OOM): пікова купа за MXBean і пікова робоча пам'ять процесу (Windows). */
+    private fun memLog(dir: File) {
+        val rt = Runtime.getRuntime()
+        val heapPeak = java.lang.management.ManagementFactory.getMemoryPoolMXBeans()
+            .filter { it.type == java.lang.management.MemoryType.HEAP }.sumOf { it.peakUsage.used }
+        val ws = runCatching {
+            val pid = ProcessHandle.current().pid()
+            val p = ProcessBuilder("powershell", "-NoProfile", "-Command", "(Get-Process -Id $pid).PeakWorkingSet64")
+                .redirectErrorStream(true).start()
+            val out = p.inputStream.bufferedReader().readText().trim()
+            p.waitFor(20, TimeUnit.SECONDS)
+            out.toLongOrNull()
+        }.getOrNull()
+        File(dir, "mem.log").appendText(
+            "${java.time.Instant.now()}\theap_used_mb=${(rt.totalMemory() - rt.freeMemory()) shr 20}\theap_peak_mb=${heapPeak shr 20}" +
+                "\theap_max_mb=${rt.maxMemory() shr 20}\tpeak_working_set_mb=${ws?.let { it shr 20 } ?: "?"}\n",
+        )
+    }
+
+    private fun memSummary(dir: File): String {
+        val lines = File(dir, "mem.log").takeIf { it.isFile }?.readLines().orEmpty()
+        fun max(key: String) = lines.mapNotNull { l -> Regex("$key=(\\d+)").find(l)?.groupValues?.get(1)?.toLong() }.maxOrNull()
+        return "Пам'ять JVM: пікова купа ${max("heap_peak_mb")} МБ (макс. ${max("heap_max_mb")} МБ), " +
+            "пікова робоча пам'ять процесу ${max("peak_working_set_mb")} МБ; журнал mem.log"
     }
 
     private fun playGame(
         env: CalibrationEnv, factory: DefaultChessGameFactory, engine: UciProcessEngine, pairKey: String, g: Int,
-        strong: String, weak: String, handicapLevels: Map<String, DifficultyLevel>, eloLevel: DifficultyLevel,
+        strong: String, weak: String, handicapLevels: Map<String, DifficultyLevel>, eloLevels: Map<Int, DifficultyLevel>,
         seed: Long, maxPlies: Int, tempC: String, activity: AtomicLong,
     ): GameRecord {
         val opening = (g / 2) % Openings.lines.size // пари партій (g, g+1) грають той самий дебют зі зміною кольорів
@@ -352,7 +410,8 @@ internal object MatchTool {
         val tracing = traceFile != null && g < traceGames
         val tracer = TraceEngine(engine)
         fun mover(side: String, slot: Int): (List<Uci>) -> Uci = when (side) {
-            "E" -> { moves ->
+            "E", "E1320", "E1500", "E1700" -> { moves ->
+                val eloLevel = eloLevels.getValue(eloOf(side)!!)
                 val r = runBlocking { engine.bestMove(MoveRequest(Fen(CalibrationEnv.START_FEN), moves, eloLevel)) }
                 (r as? ChessResult.Ok)?.value?.best ?: error("UCI_Elo: ${(r as ChessResult.Err).error}")
             }
@@ -430,9 +489,8 @@ internal object MatchTool {
     fun report(dir: File): String {
         val file = File(dir, "results.tsv")
         val records = if (file.isFile) file.readLines().mapNotNull(GameRecord::parse) else emptyList()
-        val eloValue = File(dir, "config.txt").takeIf { it.isFile }?.readText()?.substringAfter("eloUci=")?.lineSequence()?.first()?.trim()?.toIntOrNull() ?: 0
         val out = StringBuilder()
-        out.appendLine("| Пара (сильніший проти слабшого) | партій | перемоги / нічиї / поразки | очки сильнішого | % | 95 % ДІ | ≥ 60 % | Δ Elo (орієнт.) | з білими % / з чорними % | сер. півходів | обрив за 300 пн |")
+        out.appendLine("| Пара (сторона A проти B; очки за міткою A) | партій | перемоги A / нічиї / поразки A | очки A | % | 95 % ДІ | ≥ 60 % | Δ Elo A−B (95 % ДІ) | A з білими % / A з чорними % | сер. півходів | обрив за 300 пн |")
         out.appendLine("|---|---|---|---|---|---|---|---|---|---|---|")
         for ((key, sides) in ALL_PAIRS) {
             val (strong, weak) = sides
@@ -451,15 +509,19 @@ internal object MatchTool {
             val elo = 400 * log10(pc / (1 - pc))
             val whiteScores = rs.filter { it.white == strong }.map { it.strongerScore(strong) }
             val blackScores = rs.filter { it.white != strong }.map { it.strongerScore(strong) }
+            fun eloOfP(x: Double) = 400 * log10(x.coerceIn(0.001, 0.999) / (1 - x.coerceIn(0.001, 0.999)))
+            val eloLo = eloOfP(lo)
+            val eloHi = eloOfP(hi)
             val verdict = when {
+                key in LOCATOR_PAIRS -> "— (локатор)"
                 n < 100 -> if (p >= 0.6) "так (n<100, попередньо)" else "ні (n<100, попередньо)"
                 p >= 0.6 && lo >= 0.6 -> "так"
                 p >= 0.6 -> "так (нижня межа ДІ ${f1(lo * 100)} %)"
                 else -> "НІ"
             }
             out.appendLine(
-                "| ${sideName(strong, eloValue)} проти ${sideName(weak, eloValue)} | $n | $w / $d / $l | ${f1(p * n)} з $n | ${f1(p * 100)} | " +
-                    "${f1(lo * 100)}–${f1(hi * 100)} | $verdict | ${f1(elo)} | " +
+                "| ${sideName(strong)} проти ${sideName(weak)} | $n | $w / $d / $l | ${f1(p * n)} з $n | ${f1(p * 100)} | " +
+                    "${f1(lo * 100)}–${f1(hi * 100)} | $verdict | ${f1(elo)} (${f1(eloLo)}…${f1(eloHi)}) | " +
                     "${if (whiteScores.isEmpty()) "—" else f1(whiteScores.average() * 100)} / ${if (blackScores.isEmpty()) "—" else f1(blackScores.average() * 100)} | " +
                     "${f1(rs.map { it.plies }.average())} | ${rs.count { it.reason == "maxplies" }} |",
             )
