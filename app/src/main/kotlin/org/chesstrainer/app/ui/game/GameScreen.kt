@@ -173,8 +173,10 @@ private fun StatusLine(state: GameUiState, modifier: Modifier = Modifier) {
         )
         Text(
             text = stringResource(R.string.game_level_label, difficultyName(state.difficultyId)),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Помітний, але не головніший за рядок стану: titleSmall + колір primary з теми (запит Архітектора, косметика).
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
         )
         if (state.engine is EngineStatus.Starting) {
             Text(
