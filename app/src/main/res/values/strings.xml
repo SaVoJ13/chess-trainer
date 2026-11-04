@@ -226,4 +226,36 @@
     <string name="puzzle_theme_opening">Opening</string>
     <string name="puzzle_theme_middlegame">Middlegame</string>
     <string name="puzzle_theme_endgame">Endgame</string>
+
+    <!-- Analysis board -->
+    <string name="analysis_action_open">Analysis</string>
+    <string name="analysis_title">Analysis board</string>
+    <string name="analysis_fen_label">Position (FEN)</string>
+    <string name="analysis_fen_load">Load</string>
+    <string name="analysis_fen_start">Start position</string>
+    <string name="analysis_fen_empty">Enter or paste a FEN first.</string>
+    <string name="analysis_fen_invalid">This FEN cannot be loaded. Check that it has six fields separated by spaces (pieces, side to move, castling, en passant, halfmove clock, move number), that each side has exactly one king, and that the side not to move is not in check.</string>
+    <string name="analysis_start">Start</string>
+    <string name="analysis_stop">Stop</string>
+    <string name="analysis_lines_label">Lines</string>
+    <string name="analysis_cd_lines">Show %1$d lines</string>
+    <string name="analysis_note">The engine analyses at full strength. The evaluation is from White’s point of view: plus means White is better, minus means Black is better.</string>
+    <string name="analysis_status_idle">Analysis is stopped. Press Start.</string>
+    <string name="analysis_status_starting">Starting the engine…</string>
+    <string name="analysis_status_running">Analysing…</string>
+    <string name="analysis_waiting">Waiting for the first evaluation…</string>
+    <string name="analysis_depth">depth %1$d</string>
+    <string name="analysis_adv_white">White is better</string>
+    <string name="analysis_adv_black">Black is better</string>
+    <string name="analysis_adv_equal">Equal</string>
+    <string name="analysis_mate_in">Mate in %1$d</string>
+    <string name="analysis_mate_white">White mates</string>
+    <string name="analysis_mate_black">Black mates</string>
+    <string name="analysis_side_white">White to move</string>
+    <string name="analysis_side_black">Black to move</string>
+    <string name="analysis_verdict_checkmate_white">Checkmate. White has won.</string>
+    <string name="analysis_verdict_checkmate_black">Checkmate. Black has won.</string>
+    <string name="analysis_verdict_stalemate">Stalemate. This is a draw.</string>
+    <string name="analysis_verdict_insufficient">Not enough material to mate. This is a draw.</string>
+    <string name="analysis_moves_empty">No moves yet. Move pieces on the board for either side.</string>
 </resources>

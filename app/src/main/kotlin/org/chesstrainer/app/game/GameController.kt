@@ -70,6 +70,9 @@ class GameController(
     private var stopJob: Job? = null
     private var paused = false
 
+    /** Рушій віддано дошці аналізу ([holdEngine]). */
+    private var held = false
+
     private val engineLock = Mutex()
     private var pendingNewGame = false
 
@@ -97,6 +100,10 @@ class GameController(
     /** Застосунок пішов у фон: пошук скасовано, рушій зупинено. Повернення: [onForeground]. */
     fun onBackground() {
         if (paused) return
+        pauseEngine()
+    }
+
+    private fun pauseEngine() {
         paused = true
         persist()
         invalidateSearch()
@@ -105,8 +112,26 @@ class GameController(
         stopEngineAsync()
     }
 
+    /**
+     * Дошка аналізу бере рушій собі (CONTRACTS 3.4: один рушій і один пошук на застосунок): пошук гри скасовано,
+     * рушій зупинено, і завершення `stop()` дочекано, щоб він не зупинив рушій аналізу. Поки рушій утримано,
+     * [onForeground] його не відновлює. Повернення: [releaseEngine].
+     */
+    suspend fun holdEngine() {
+        held = true
+        if (!paused) pauseEngine()
+        stopJob?.join()
+    }
+
+    /** Аналіз закрито: рушій гри відновлюється так, ніби застосунок щойно повернувся з фону. */
+    fun releaseEngine() {
+        if (!held) return
+        held = false
+        onForeground()
+    }
+
     fun onForeground() {
-        if (!paused) return
+        if (!paused || held) return
         paused = false
         val s = state.value
         if (s.engine is EngineStatus.Problem || s.isOver) return
@@ -116,6 +141,7 @@ class GameController(
 
     /** Нестача пам'яті: зупиняємо рушій, лише якщо він зараз не веде пошук; наступний хід запустить його знову. */
     fun onTrimMemory() {
+        if (held) return // рушій зараз належить дошці аналізу, яка сама вирішує, що робити при нестачі пам'яті
         val s = state.value
         if (s.engine is EngineStatus.Thinking || s.engine is EngineStatus.Starting) return
         warmJob?.cancel()

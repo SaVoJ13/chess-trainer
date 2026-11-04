@@ -4,18 +4,22 @@
 package org.chesstrainer.app.game
 
 import android.app.Application
+import android.content.ComponentCallbacks2
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.chesstrainer.app.analysis.AnalysisController
 import org.chesstrainer.app.settings.SharedPrefsDifficultyPreferences
 import org.chesstrainer.app.storage.GameStorage
 import org.chesstrainer.core.engine.DefaultDifficultyPresets
 import org.chesstrainer.core.engine.EngineService
 import org.chesstrainer.core.engine.HandicapEngineService
+import org.chesstrainer.core.game.ChessGame
 import org.chesstrainer.core.game.DefaultChessGameFactory
 import org.chesstrainer.core.rules.ChesslibRules
 import org.chesstrainer.engine.RemoteEngineService
@@ -41,13 +45,75 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         saver = GameStorage.saver(application),
     )
 
+    /**
+     * Дошка аналізу ділить із грою той самий рушій (CONTRACTS 3.4: один екземпляр на застосунок). Аналіз іде через
+     * `analyse`, що завжди на повну силу, тому обгортка Handicap його не обмежує.
+     */
+    val analysis = AnalysisController(
+        rules = rules,
+        games = DefaultChessGameFactory(rules),
+        engine = engine,
+        scope = viewModelScope,
+    )
+
     init {
         controller.start()
         controller.checkForSavedGame()
     }
 
+    /** Переходи гра↔аналіз виконуються по черзі, щоб швидке подвійне натискання не віддало рушій двом власникам. */
+    private var transition: Job? = null
+
+    /** Дошку аналізу відкрито (виставляється одразу, ще до завершення переходу): навігація після відновлення стану за цим знає, чи показувати екран. */
+    var analysisOpen = false
+        private set
+
+    /** Відкриває дошку аналізу: рушій гри віддається аналізу, після чого `open` запускає пошук. */
+    fun openAnalysis(game: ChessGame? = null, ply: Int = 0) {
+        analysisOpen = true
+        val before = transition
+        transition = viewModelScope.launch {
+            before?.join()
+            controller.holdEngine()
+            if (game == null) analysis.openEmpty() else analysis.open(game, ply)
+        }
+    }
+
+    /** Закриває дошку аналізу: рушій зупинено, гра відновлюється. Живе у `viewModelScope`, тож поворот екрана не перериває. */
+    fun closeAnalysis() {
+        analysisOpen = false
+        val before = transition
+        transition = viewModelScope.launch {
+            before?.join()
+            analysis.close()
+            controller.releaseEngine()
+        }
+    }
+
+    // Життєвий цикл застосунку: рушій належить або грі, або аналізу, але не обом одразу.
+    fun onForeground() {
+        controller.onForeground()
+        analysis.onForeground()
+    }
+
+    fun onBackground() {
+        controller.onBackground()
+        analysis.onBackground()
+    }
+
+    fun onTrimMemory(level: Int) {
+        controller.onTrimMemory()
+        // Для аналізу значення лише `RUNNING_CRITICAL` (застосунок на екрані). Рівні «UI_HIDDEN» і вищі приходять
+        // при згортанні, коли аналіз уже зупинив `onBackground` і має відновитися після повернення.
+        @Suppress("DEPRECATION")
+        if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) analysis.onTrimMemory()
+    }
+
     override fun onCleared() {
         // viewModelScope уже скасовано, тому зупинка рушія йде окремою областю й завершується сама.
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { controller.shutdown() }
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            analysis.close()
+            controller.shutdown()
+        }
     }
 }

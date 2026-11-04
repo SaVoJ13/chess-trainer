@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             ChessTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppNavigation(viewModel.controller, gamesViewModel, puzzles = { puzzleViewModel.controller })
+                    AppNavigation(viewModel, gamesViewModel, puzzles = { puzzleViewModel.controller })
                 }
             }
         }
@@ -39,18 +39,18 @@ class MainActivity : ComponentActivity() {
     // Поворот екрана (зміна конфігурації) рушія не зачіпає: ViewModel живе далі.
     override fun onStart() {
         super.onStart()
-        viewModel.controller.onForeground()
+        viewModel.onForeground()
     }
 
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) viewModel.controller.onBackground()
+        if (!isChangingConfigurations) viewModel.onBackground()
     }
 
     @Suppress("OVERRIDE_DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         @Suppress("DEPRECATION")
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) viewModel.controller.onTrimMemory()
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) viewModel.onTrimMemory(level)
     }
 }
