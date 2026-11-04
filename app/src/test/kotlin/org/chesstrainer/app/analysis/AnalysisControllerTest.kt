@@ -174,6 +174,32 @@ class AnalysisControllerTest {
         assertEquals(start, state.fenText)
     }
 
+    @Test
+    fun engineUpdatesDoNotTouchTheFenFieldOrItsError() = scenario { fake ->
+        fake.onAnalyse {
+            listOf(
+                update(1, Evaluation.Centipawns(10), "e2e4", depth = 10),
+                update(1, Evaluation.Centipawns(12), "e2e4", depth = 11),
+                update(1, Evaluation.Centipawns(15), "e2e4", depth = 12),
+                AnalysisEvent.Finished,
+            )
+        }
+        controller.openEmpty()
+        controller.onFenTextChange("це не FEN")
+        controller.loadFen()
+        assertEquals(FenProblem.INVALID, state.fenProblem)
+        controller.onFenTextChange("rnbqkbnr/pppppppp/8/8/8 w")
+        controller.startAnalysis()
+        await { it.lines.firstOrNull()?.depth == 12 }
+        assertEquals("текст, який вводить користувач, не скидається оновленнями оцінки", "rnbqkbnr/pppppppp/8/8/8 w", state.fenText)
+        controller.loadFen()
+        assertEquals(FenProblem.INVALID, state.fenProblem)
+        controller.startAnalysis()
+        await { it.lines.firstOrNull()?.depth == 12 }
+        assertEquals("помилка FEN теж лишається, доки користувач не змінить текст", FenProblem.INVALID, state.fenProblem)
+        assertEquals("rnbqkbnr/pppppppp/8/8/8 w", state.fenText)
+    }
+
     // --- оцінка ---
 
     @Test

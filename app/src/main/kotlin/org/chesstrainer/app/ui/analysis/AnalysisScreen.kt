@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -41,6 +44,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -55,6 +60,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import android.content.res.Configuration
 import org.chesstrainer.app.R
 import org.chesstrainer.app.analysis.Advantage
 import org.chesstrainer.app.analysis.AnalysisController
@@ -81,6 +87,13 @@ private val MinTouch = 48.dp
 @Composable
 fun AnalysisScreen(controller: AnalysisController, onBack: () -> Unit) {
     val state by controller.state.collectAsState()
+    // Макет обирає фізична орієнтація екрана, а НЕ співвідношення розмірів у BoxWithConstraints: коли виїжджає клавіатура,
+    // висота зменшується нижче ширини, макет перемикався на альбомний, поле FEN знищувалось і втрачало фокус, а клавіатура
+    // одразу ховалась (доказ: лог `FenPanel DISPOSED/ENTER` при maxH 386 dp < maxW 387 dp, docs/project_log.md, сесія 12).
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // Поки відкрита клавіатура, у портретному макеті дошку й навігацію ховаємо: на висоті ≈ 370 dp для поля FEN місця майже не лишається.
+    // Це лише додає чи прибирає сусідні елементи: прокручувана колонка з полем лишається на тому самому місці й не перестворюється.
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     Column(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = onBack, modifier = Modifier.heightIn(min = MinTouch)) {
@@ -93,7 +106,7 @@ fun AnalysisScreen(controller: AnalysisController, onBack: () -> Unit) {
             )
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            if (maxWidth > maxHeight) {
+            if (landscape) {
                 val side = minOf(maxHeight, maxWidth * 0.5f)
                 Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Board(state, controller, side)
@@ -112,8 +125,10 @@ fun AnalysisScreen(controller: AnalysisController, onBack: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Board(state, controller, side)
-                    Navigation(state, controller)
+                    if (!imeVisible) {
+                        Board(state, controller, side)
+                        Navigation(state, controller)
+                    }
                     Column(
                         Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -349,6 +364,9 @@ private fun verdictText(verdict: PositionVerdict): Int = when (verdict) {
 
 @Composable
 private fun FenPanel(state: AnalysisState, controller: AnalysisController) {
+    val focus = LocalFocusManager.current
+    // Завантаження ховає клавіатуру: фокус знімається, щоб дошка й оцінка були видні.
+    val load = { focus.clearFocus(); controller.loadFen() }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         OutlinedTextField(
             value = state.fenText,
@@ -368,15 +386,19 @@ private fun FenPanel(state: AnalysisState, controller: AnalysisController) {
                 autoCorrectEnabled = false,
                 imeAction = ImeAction.Done,
             ),
+            keyboardActions = KeyboardActions(onDone = { load() }),
             minLines = 1,
             maxLines = 3,
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = controller::loadFen, modifier = Modifier.heightIn(min = MinTouch)) {
+            Button(onClick = load, modifier = Modifier.heightIn(min = MinTouch)) {
                 Text(stringResource(R.string.analysis_fen_load))
             }
-            OutlinedButton(onClick = controller::loadStartPosition, modifier = Modifier.heightIn(min = MinTouch)) {
+            OutlinedButton(
+                onClick = { focus.clearFocus(); controller.loadStartPosition() },
+                modifier = Modifier.heightIn(min = MinTouch),
+            ) {
                 Text(stringResource(R.string.analysis_fen_start))
             }
         }
