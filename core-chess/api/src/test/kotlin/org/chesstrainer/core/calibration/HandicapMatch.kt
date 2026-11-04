@@ -71,7 +71,10 @@ private fun sideName(side: String) = when {
 }
 
 /** Рівні `UCI_Elo`, доступні в матчах: значення -> `DifficultyId` пресета. */
-private val ELO_SIDES = linkedMapOf(1320 to DifficultyIds.ELO_MIN, 1500 to DifficultyIds.ELO_1500, 1700 to DifficultyIds.ELO_1700)
+private val ELO_SIDES = linkedMapOf(
+    1320 to DifficultyIds.ELO_MIN, 1500 to DifficultyIds.ELO_1500, 1700 to DifficultyIds.ELO_1700,
+    1900 to DifficultyIds.ELO_1900, 2100 to DifficultyIds.ELO_2100,
+)
 
 private fun eloOf(side: String): Int? = when {
     side == "E" -> 1320
@@ -100,9 +103,15 @@ private val ALL_PAIRS: Map<String, Pair<String, String>> = linkedMapOf(
     "E1500-5" to ("E1500" to "H5"),
     "E1700-5" to ("E1700" to "H5"),
     "E1500-E1320" to ("E1500" to "E1320"),
+    // Локатори вище 1700 (CONTRACTS v0.20, рішення Архітектора сесії 21) і пара 1500–1700 для нової драбини.
+    "E1700-E1500" to ("E1700" to "E1500"),
+    "E1900-E1700" to ("E1900" to "E1700"),
+    "E2100-E1900" to ("E2100" to "E1900"),
 )
 
-private val LOCATOR_PAIRS = setOf("E1320-1", "E1320-2", "E1320-3", "E1320-4", "E1500-5", "E1700-5", "E1500-E1320")
+private val LOCATOR_PAIRS = setOf(
+    "E1320-1", "E1320-2", "E1320-3", "E1320-4", "E1500-5", "E1700-5", "E1500-E1320", "E1700-E1500", "E1900-E1700", "E2100-E1900",
+)
 
 private val DEFAULT_PAIRS = listOf("1-2", "2-3", "3-4", "4-5", "E-5")
 
@@ -410,7 +419,7 @@ internal object MatchTool {
         val tracing = traceFile != null && g < traceGames
         val tracer = TraceEngine(engine)
         fun mover(side: String, slot: Int): (List<Uci>) -> Uci = when (side) {
-            "E", "E1320", "E1500", "E1700" -> { moves ->
+            "E", "E1320", "E1500", "E1700", "E1900", "E2100" -> { moves ->
                 val eloLevel = eloLevels.getValue(eloOf(side)!!)
                 val r = runBlocking { engine.bestMove(MoveRequest(Fen(CalibrationEnv.START_FEN), moves, eloLevel)) }
                 (r as? ChessResult.Ok)?.value?.best ?: error("UCI_Elo: ${(r as ChessResult.Err).error}")
