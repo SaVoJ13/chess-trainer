@@ -87,6 +87,7 @@ if (-not (Test-Installed)) { Write-Host "Застосунок $pkg не вста
 "user: $userId  installed: yes" | Tee-Object -Append "$out\device-env.log"
 
 # Сценарій PrototypeActivity: чекаємо рядок "END scenario=<name>" у logcat (тег EnginePrototype).
+# Фільтр лише EnginePrototype:I: для одного тега діє останній рівень у списку, тому перелік :I :W :E залишав тільки :E.
 function Invoke-Scenario([string]$name, [string]$mode, [int]$repeat, [int]$timeoutSec) {
     $log = "$out\device-$name-$mode.log"
     $summary = "$out\device-summary.log"
@@ -102,7 +103,7 @@ function Invoke-Scenario([string]$name, [string]$mode, [int]$repeat, [int]$timeo
     $finished = $false; $text = ""; $gone = 0; $reason = "timeout"
     while ((Get-Date) -lt $deadline) {
         Start-Sleep -Seconds 5
-        $text = (adb logcat -d -s EnginePrototype:I EnginePrototype:W EnginePrototype:E) -join "`n"
+        $text = (adb logcat -d -s EnginePrototype:I) -join "`n"
         if ($text -match "END scenario=$name") { $finished = $true; $reason = "ok"; break }
         # Процес застосунку зник без END: далі чекати немає сенсу (дві перевірки поспіль).
         $appPid = ((adb shell pidof $pkg) -join "").Trim()
