@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -100,25 +101,25 @@ fun GameScreen(
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Board(state, controller, boardSide)
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusLine(state)
+                    StatusHeader(state, onOpenAnalysis)
                     Notices(state, controller)
                     MoveList(state, vertical = true, modifier = Modifier.weight(1f).fillMaxWidth())
-                    ActionButtons(state, controller, onOpenGames, onOpenPuzzles, onOpenAnalysis, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
+                    ActionButtons(state, controller, onOpenGames, onOpenPuzzles, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
                 }
             }
         } else {
-            val boardSide = minOf(maxWidth, (maxHeight - 310.dp).coerceAtLeast(220.dp))
+            val boardSide = minOf(maxWidth, (maxHeight - 260.dp).coerceAtLeast(220.dp))
             Column(
                 Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                StatusLine(state, Modifier.fillMaxWidth())
+                StatusHeader(state, onOpenAnalysis, Modifier.fillMaxWidth())
                 Board(state, controller, boardSide)
                 Notices(state, controller)
                 MoveList(state, vertical = false, modifier = Modifier.fillMaxWidth().height(44.dp))
                 Spacer(Modifier.weight(1f))
-                ActionButtons(state, controller, onOpenGames, onOpenPuzzles, onOpenAnalysis, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
+                ActionButtons(state, controller, onOpenGames, onOpenPuzzles, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
             }
         }
     }
@@ -154,6 +155,20 @@ private fun Board(state: GameUiState, controller: GameController, side: Dp) {
         onDrop = controller::onDrop,
         modifier = Modifier.size(side),
     )
+}
+
+/**
+ * Рядок стану й кнопка входу в аналіз. Кнопка стоїть угорі поруч зі статусом, а не серед кнопок унизу: нижні кнопки
+ * на низьких екранах і в альбомній орієнтації виштовхуються за край, а вхід в аналіз має бути видно завжди.
+ */
+@Composable
+private fun StatusHeader(state: GameUiState, onOpenAnalysis: () -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        StatusLine(state, Modifier.weight(1f))
+        FilledTonalButton(onClick = onOpenAnalysis, modifier = Modifier.heightIn(min = MinTouch)) {
+            Text(stringResource(R.string.analysis_action_open), maxLines = 1)
+        }
+    }
 }
 
 @Composable
@@ -326,7 +341,6 @@ private fun ActionButtons(
     controller: GameController,
     onOpenGames: () -> Unit,
     onOpenPuzzles: () -> Unit,
-    onOpenAnalysis: () -> Unit,
     onResign: () -> Unit,
     onNewGame: () -> Unit,
 ) {
@@ -340,9 +354,6 @@ private fun ActionButtons(
             ActionButton(R.string.puzzle_action_open, enabled = true, onClick = onOpenPuzzles)
             ActionButton(R.string.game_action_resign, enabled = !state.isOver, onClick = onResign)
             ActionButton(R.string.game_action_new_game, enabled = true, primary = true, onClick = onNewGame)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ActionButton(R.string.analysis_action_open, enabled = true, onClick = onOpenAnalysis)
         }
     }
 }
