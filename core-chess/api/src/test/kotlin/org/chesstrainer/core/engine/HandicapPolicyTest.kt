@@ -91,7 +91,7 @@ class HandicapPolicyTest {
         val b300 = (1..HandicapPolicy.STEPS).map { step -> mix.map { probLoss(it, step, 300) }.average() }
         assertStrictlyDecreasing("B300", b300)
         assertTrue("step 1 B300 ${b300[0]}", b300[0] in 0.20..0.35)
-        assertTrue("step 5 B300 ${b300[4]}", b300[4] in 0.0..0.05)
+        assertTrue("step 5 B300 ${b300[4]}", b300[4] in 0.0..0.15) // цілі п. 4 (v0.21) лише на реальних позиціях, див. HANDICAP.md
         for (s in typical) assertStrictlyDecreasing("B300 $s", (1..HandicapPolicy.STEPS).map { probLoss(s, it, 300) })
     }
 
@@ -194,7 +194,7 @@ class HandicapPolicyTest {
         val miss1 = (1..20_000).count { chooseWith(s, 1, rng) != s[0].uci } / 20_000.0
         val miss5 = (1..20_000).count { chooseWith(s, 5, rng) != s[0].uci } / 20_000.0
         assertTrue("miss1 $miss1", miss1 in 0.3..0.7)
-        assertTrue("miss5 $miss5", miss5 < 0.06)
+        assertTrue("miss5 $miss5", miss5 < 0.25) // blind 18 % на кроці 5 (v0.21)
     }
 
     @Test

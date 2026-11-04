@@ -49,10 +49,10 @@ internal object HandicapPolicy {
     private val profiles = listOf(
         //             T    maxLoss blind rnd depth delay
         HandicapProfile(193, 1000, 500, 100, 1, 700),
-        HandicapProfile(126, 800, 300, 40, 2, 600),
-        HandicapProfile(91, 600, 150, 0, 3, 500),
-        HandicapProfile(61, 450, 70, 0, 4, 400),
-        HandicapProfile(42, 350, 30, 0, 5, 300),
+        HandicapProfile(140, 900, 400, 70, 1, 600),
+        HandicapProfile(135, 800, 300, 0, 2, 500),
+        HandicapProfile(115, 700, 250, 0, 3, 400),
+        HandicapProfile(100, 650, 180, 0, 3, 300),
     )
 
     fun profile(step: Int): HandicapProfile {

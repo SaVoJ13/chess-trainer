@@ -127,4 +127,6 @@ androidComponents {
 
 dependencies {
     api(project(":core-chess:api"))
+    // JUnit 4 уже в каталозі версій і в :core-chess:api; тести таймаутів UciEngineService на JVM (запит QA, затверджено сесією 22).
+    testImplementation(libs.junit)
 }

@@ -178,9 +178,9 @@ class HandicapEngineServiceTest {
         }
         val afterG4 = Fen("rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2")
         val engine = service(fake)
-        // Найсильніший крок майже завжди бачить мат (blind 2,5 %): у 200 спробах мат обирається в переважній більшості.
+        // Найсильніший крок бачить мат у ≈ 82 % спроб (blind 18 %, v0.21): у 200 спробах мат обирається в переважній більшості.
         val picks = (1..200).map { (engine.bestMove(request(handicap(5), afterG4)) as ChessResult.Ok).value.best.value }
-        assertTrue(picks.count { it == "d8h4" } > 180)
+        assertTrue(picks.count { it == "d8h4" } > 135)
     }
 
     @Test
@@ -193,7 +193,7 @@ class HandicapEngineServiceTest {
             picks.count { it == best } / 1500.0
         }
         for (i in 1 until shares.size) assertTrue("shares $shares", shares[i] >= shares[i - 1] - 0.03)
-        assertTrue("shares $shares", shares.last() > shares.first() + 0.2)
+        assertTrue("shares $shares", shares.last() > shares.first() + 0.08)
     }
 
     // --- семантика EngineService ---
