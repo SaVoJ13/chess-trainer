@@ -69,7 +69,7 @@ class DefaultDifficultyPresets : DifficultyPresets {
                     result += DifficultyLevel(
                         id = step.id,
                         strength = Strength.Elo(elo),
-                        limit = SearchLimit(moveTimeMs = step.moveTimeMs),
+                        limit = if (step.nodes != null) SearchLimit(nodes = step.nodes, moveTimeMs = 3 * step.moveTimeMs) else SearchLimit(moveTimeMs = step.moveTimeMs),
                         minReplyDelayMs = step.delayMs,
                         approxElo = elo,
                         group = step.group,
@@ -95,18 +95,21 @@ class DefaultDifficultyPresets : DifficultyPresets {
         val id: DifficultyId,
         /** `null` = нижня межа `eloRange`. */
         val elo: Int?,
+        /** Час пресета (мс): для рівнів з [nodes] ліміт часу це стеля 3 × moveTimeMs. */
         val moveTimeMs: Long,
+        /** Ліміт вузлів (CONTRACTS 3.4/3.5 п. 8, v0.20): медіана вузлів за час пресета на SM-S928B; `null` = лише час. */
+        val nodes: Long?,
         val delayMs: Long,
         val group: DifficultyGroup,
     )
 
     private val eloSteps = listOf(
-        EloStep(DifficultyIds.ELO_MIN, null, 300, 400, DifficultyGroup.AMATEUR),
-        EloStep(DifficultyIds.ELO_1500, 1500, 400, 350, DifficultyGroup.AMATEUR),
-        EloStep(DifficultyIds.ELO_1700, 1700, 500, 300, DifficultyGroup.AMATEUR),
-        EloStep(DifficultyIds.ELO_1900, 1900, 600, 250, DifficultyGroup.CLUB),
-        EloStep(DifficultyIds.ELO_2100, 2100, 800, 200, DifficultyGroup.CLUB),
-        EloStep(DifficultyIds.ELO_2400, 2400, 1000, 150, DifficultyGroup.STRONG),
-        EloStep(DifficultyIds.ELO_2700, 2700, 1200, 100, DifficultyGroup.STRONG),
+        EloStep(DifficultyIds.ELO_MIN, null, 300, 267_319, 400, DifficultyGroup.AMATEUR),
+        EloStep(DifficultyIds.ELO_1500, 1500, 400, 347_779, 350, DifficultyGroup.AMATEUR),
+        EloStep(DifficultyIds.ELO_1700, 1700, 500, 427_741, 300, DifficultyGroup.AMATEUR),
+        EloStep(DifficultyIds.ELO_1900, 1900, 600, 524_630, 250, DifficultyGroup.CLUB),
+        EloStep(DifficultyIds.ELO_2100, 2100, 800, 677_873, 200, DifficultyGroup.CLUB),
+        EloStep(DifficultyIds.ELO_2400, 2400, 1000, null, 150, DifficultyGroup.STRONG),
+        EloStep(DifficultyIds.ELO_2700, 2700, 1200, null, 100, DifficultyGroup.STRONG),
     )
 }

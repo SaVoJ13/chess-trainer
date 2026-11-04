@@ -118,4 +118,24 @@ class DifficultyPresetsTest {
             assertEquals(profile.minReplyDelayMs, level.minReplyDelayMs)
         }
     }
+
+    @Test
+    fun `Elo levels stop at the node limit with a time ceiling of three times the preset time, Full stays time-limited`() {
+        // CONTRACTS 3.4/3.5 п. 8 (v0.20): медіани вузлів за час пресета на SM-S928B (HANDICAP.md, розд. 8.4 і 9).
+        val expected = mapOf(
+            DifficultyIds.ELO_MIN to SearchLimit(nodes = 267_319, moveTimeMs = 900),
+            DifficultyIds.ELO_1500 to SearchLimit(nodes = 347_779, moveTimeMs = 1_200),
+            DifficultyIds.ELO_1700 to SearchLimit(nodes = 427_741, moveTimeMs = 1_500),
+            DifficultyIds.ELO_1900 to SearchLimit(nodes = 524_630, moveTimeMs = 1_800),
+            DifficultyIds.ELO_2100 to SearchLimit(nodes = 677_873, moveTimeMs = 2_400),
+        )
+        for ((id, limit) in expected) assertEquals("ліміт $id", limit, presets.byId(id, caps)?.limit)
+        assertEquals(SearchLimit(moveTimeMs = 1500), presets.byId(DifficultyIds.FULL, caps)?.limit)
+        // Рівні без виміряних вузлів лишаються на часі.
+        for (id in listOf(DifficultyIds.ELO_2400, DifficultyIds.ELO_2700)) {
+            val l = presets.byId(id, caps)?.limit
+            assertNull(l?.nodes)
+            assertTrue(l?.moveTimeMs != null)
+        }
+    }
 }

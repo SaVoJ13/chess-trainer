@@ -9,10 +9,8 @@
             android:label="@string/prototype_title"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|uiMode|smallestScreenSize|density"
             android:launchMode="singleTask">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+            <!-- Без intent-filter LAUNCHER: значка в списку застосунків немає; запуск лише явно
+                 (явний am start з параметром user 0, як у tests/run-device.ps1). -->
         </activity>
     </application>
 </manifest>
