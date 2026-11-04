@@ -60,6 +60,20 @@ class DifficultyPresetsTest {
     }
 
     @Test
+    fun `byId gives null for an Elo level outside the engine eloRange`() {
+        // Запит QA O-04: рівень, чий Elo не потрапляє в capabilities.eloRange, недоступний, а не підміняється.
+        val narrow = caps.copy(eloRange = 1600..2200)
+        for (id in listOf(DifficultyIds.ELO_1500, DifficultyIds.ELO_2400, DifficultyIds.ELO_2700)) {
+            assertNull("id ${id.value}", presets.byId(id, narrow))
+        }
+        assertEquals(DifficultyIds.ELO_1700, presets.byId(DifficultyIds.ELO_1700, narrow)?.id)
+        val none = caps.copy(eloRange = null)
+        for (id in listOf(DifficultyIds.ELO_MIN, DifficultyIds.ELO_1500, DifficultyIds.ELO_2100)) {
+            assertNull("id ${id.value}", presets.byId(id, none))
+        }
+    }
+
+    @Test
     fun `without an Elo option no Elo levels are offered`() {
         val levels = presets.levels(caps.copy(eloRange = null))
         assertTrue(levels.none { it.strength is Strength.Elo })

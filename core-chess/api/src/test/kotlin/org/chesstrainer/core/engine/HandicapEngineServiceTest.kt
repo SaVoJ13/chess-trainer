@@ -178,7 +178,7 @@ class HandicapEngineServiceTest {
         }
         val afterG4 = Fen("rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2")
         val engine = service(fake)
-        // Найсильніший крок бачить мат у ≈ 82 % спроб (blind 18 %, v0.21): у 200 спробах мат обирається в переважній більшості.
+        // Найсильніший крок бачить мат у ≈ 75 % спроб (blind 250 ‰, профіль v0.4): у 200 спробах мат обирається в переважній більшості.
         val picks = (1..200).map { (engine.bestMove(request(handicap(5), afterG4)) as ChessResult.Ok).value.best.value }
         assertTrue(picks.count { it == "d8h4" } > 135)
     }

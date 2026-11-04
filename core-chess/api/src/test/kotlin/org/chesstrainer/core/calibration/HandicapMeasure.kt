@@ -11,6 +11,7 @@ import org.chesstrainer.core.engine.DefaultDifficultyPresets
 import org.chesstrainer.core.engine.DifficultyIds
 import org.chesstrainer.core.engine.HandicapEngineService
 import org.chesstrainer.core.engine.HandicapPolicy
+import org.chesstrainer.core.engine.HandicapCandidate
 import org.chesstrainer.core.engine.HandicapProfile
 import org.chesstrainer.core.engine.MoveRequest
 import org.chesstrainer.core.engine.SearchLimit
@@ -38,6 +39,7 @@ fun main(args: Array<String>) {
         when (command) {
             "prepare" -> prepare(env, seed, opts["games"]?.toInt() ?: 100, workers)
             "tune" -> tune(env, seed, opts["games"]?.toInt() ?: 100, workers)
+            "export-test-data" -> exportTestData(env, seed, opts["games"]?.toInt() ?: 100, workers, opts["out"] ?: error("Потрібен --out FILE.tsv.gz"))
             "measure" -> measure(env, seed, opts["games"]?.toInt() ?: 100, opts["samples"]?.toInt() ?: 20, workers)
             else -> error("Невідома команда $command")
         }
@@ -67,6 +69,29 @@ private fun prepare(env: CalibrationEnv, seed: Long, games: Int, workers: Int): 
     }
     println("Кеш пошуків: ${env.cache.size} записів. Готово.")
     return sets
+}
+
+/**
+ * Компактний тестовий ресурс для JVM-тесту метрик на реальних позиціях (`RealPositionMetricsTest`, CI без телефона):
+ * на позицію один рядок `вид \t еталон \t кандидати d1 \t d2 \t d3`, де вид `M` (основний), `T` (мат в 1), `F` (вільна фігура),
+ * еталон це `хід:оцінка` усіх легальних ходів (глибина 12), кандидати це те, що бачить декоратор (`HandicapEngineService.candidateOf`).
+ * Береться з кешу пошуків (`prepare` нічого нового не шукає); стискається gzip.
+ */
+private fun exportTestData(env: CalibrationEnv, seed: Long, games: Int, workers: Int, out: String) {
+    val sets = prepare(env, seed, games, workers)
+    fun enc(c: List<HandicapCandidate>) = c.joinToString(" ") { "${it.uci.value}:${it.scoreCp}" }
+    val lines = ArrayList<String>()
+    fun add(kind: String, fen: String) {
+        val ref = env.reference(fen)
+        val refText = ref.scores.entries.joinToString(" ") { "${it.key}:${it.value}" }
+        lines += (listOf(kind, refText) + listOf(1, 2, 3).map { enc(env.candidates(fen, it)) }).joinToString("\t")
+    }
+    sets.main.forEach { add("M", it) }
+    sets.mateInOne.forEach { add("T", it) }
+    sets.freePiece.forEach { add("F", it) }
+    val file = File(out).also { it.absoluteFile.parentFile.mkdirs() }
+    java.util.zip.GZIPOutputStream(file.outputStream()).bufferedWriter().use { w -> lines.forEach { w.write(it); w.write("\n") } }
+    println("Записано ${lines.size} позицій у ${file.absolutePath}: ${file.length()} байт")
 }
 
 /** Метрики за точним розподілом (без вибірки). Значення в частках. */
