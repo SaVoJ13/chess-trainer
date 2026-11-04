@@ -539,6 +539,48 @@ class GameControllerTest {
     }
 
     @Test
+    fun heldEngineIsStoppedAndNotResumedByForegroundUntilReleased() = scenario { fake ->
+        fake.holdSearches()
+        tap("e2", "e4")
+        awaitSearching()
+
+        controller.holdEngine()
+        assertEquals("пошук гри скасовано, а stop() дочекано", EngineState.Stopped, fake.state.value)
+        assertEquals(EngineStatus.Idle, state.engine)
+        assertEquals(1, state.game.moves.size)
+
+        // Застосунок пішов у фон і повернувся, поки відкрита дошка аналізу: рушій гри не оживає.
+        controller.onBackground()
+        controller.onForeground()
+        settle()
+        assertEquals(EngineState.Stopped, fake.state.value)
+        assertEquals(1, fake.moveRequests.size)
+
+        controller.releaseEngine()
+        awaitSearching()
+        fake.release()
+        await { it.game.moves.size == 2 }
+    }
+
+    @Test
+    fun trimMemoryIsIgnoredWhileTheEngineIsHeldForAnalysis() = scenario { fake ->
+        controller.holdEngine()
+        fake.start(EngineConfig())
+        controller.onTrimMemory()
+        settle()
+        assertEquals("рушій належить аналізу, гра його не зупиняє", EngineState.Ready, fake.state.value)
+    }
+
+    @Test
+    fun releaseWithoutHoldDoesNothing() = scenario { fake ->
+        settle()
+        val before = fake.appliedConfigs.size
+        controller.releaseEngine()
+        settle()
+        assertEquals(before, fake.appliedConfigs.size)
+    }
+
+    @Test
     fun foregroundWithoutBackgroundDoesNothing() = scenario { fake ->
         await { it.engine == EngineStatus.Idle }
         controller.onForeground()
