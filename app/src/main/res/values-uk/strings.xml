@@ -228,4 +228,36 @@
     <string name="puzzle_theme_opening">Дебют</string>
     <string name="puzzle_theme_middlegame">Міттельшпіль</string>
     <string name="puzzle_theme_endgame">Ендшпіль</string>
+
+    <!-- Дошка аналізу -->
+    <string name="analysis_action_open">Аналіз</string>
+    <string name="analysis_title">Дошка аналізу</string>
+    <string name="analysis_fen_label">Позиція (FEN)</string>
+    <string name="analysis_fen_load">Завантажити</string>
+    <string name="analysis_fen_start">Початкова позиція</string>
+    <string name="analysis_fen_empty">Спершу введіть або вставте FEN.</string>
+    <string name="analysis_fen_invalid">Цей FEN не вдалося завантажити. Перевірте, що в ньому шість полів через пробіл (фігури, чия черга, права рокіровки, взяття на проході, лічильник півходів, номер ходу), що в кожної сторони рівно один король і що сторона, яка не ходить, не під шахом.</string>
+    <string name="analysis_start">Старт</string>
+    <string name="analysis_stop">Стоп</string>
+    <string name="analysis_lines_label">Ліній</string>
+    <string name="analysis_cd_lines">Показувати ліній: %1$d</string>
+    <string name="analysis_note">Рушій аналізує на повну силу. Оцінка з погляду білих: плюс означає перевагу білих, мінус чорних.</string>
+    <string name="analysis_status_idle">Аналіз зупинено. Натисніть «Старт».</string>
+    <string name="analysis_status_starting">Запуск рушія…</string>
+    <string name="analysis_status_running">Аналіз триває…</string>
+    <string name="analysis_waiting">Чекаємо першу оцінку…</string>
+    <string name="analysis_depth">глибина %1$d</string>
+    <string name="analysis_adv_white">Перевага білих</string>
+    <string name="analysis_adv_black">Перевага чорних</string>
+    <string name="analysis_adv_equal">Рівна позиція</string>
+    <string name="analysis_mate_in">Мат у %1$d</string>
+    <string name="analysis_mate_white">Білі матують</string>
+    <string name="analysis_mate_black">Чорні матують</string>
+    <string name="analysis_side_white">Хід білих</string>
+    <string name="analysis_side_black">Хід чорних</string>
+    <string name="analysis_verdict_checkmate_white">Мат. Перемогли білі.</string>
+    <string name="analysis_verdict_checkmate_black">Мат. Перемогли чорні.</string>
+    <string name="analysis_verdict_stalemate">Пат. Нічия.</string>
+    <string name="analysis_verdict_insufficient">Недостатньо матеріалу для мату. Нічия.</string>
+    <string name="analysis_moves_empty">Ходів ще немає. Рухайте фігури на дошці за будь-яку сторону.</string>
 </resources>
