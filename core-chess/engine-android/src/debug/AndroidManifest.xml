@@ -10,7 +10,7 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|uiMode|smallestScreenSize|density"
             android:launchMode="singleTask">
             <!-- Без intent-filter LAUNCHER: значка в списку застосунків немає; запуск лише явно
-                 (adb shell am start --user 0 -n .../PrototypeActivity, як у tests/run-device.ps1). -->
+                 (явний am start з параметром user 0, як у tests/run-device.ps1). -->
         </activity>
     </application>
 </manifest>
