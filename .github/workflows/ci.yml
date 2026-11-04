@@ -89,6 +89,9 @@ jobs:
       # Інструментовані тести (тест міграції Room, CONTRACTS 5 v0.16) у CI лише компілюються: пристрою немає.
       # Запуск `:app:connectedDebugAndroidTest` виконується на телефоні власника перед злиттям.
       - run: ./gradlew :app:assembleDebugAndroidTest
+      # Release-подібна збірка (R8) лише збирається, без пристрою: помилки правил R8 (Room, chesslib, серіалізація)
+      # мають ловитись у CI, а не при першому релізі (запит Архітектора). Прибирається разом із `measure`.
+      - run: ./gradlew :app:assembleMeasure
       # Статична перевірка байткоду на API вище minSdk 26 (CONTRACTS 7.2). Потрібні JDK 17+, ANDROID_HOME
       # (platforms/android-*/data/api-versions.xml, build-tools/*/dexdump); без залежностей.
       # Код виходу 1 (є порушення) або 2 (помилка запуску) валить збірку.
