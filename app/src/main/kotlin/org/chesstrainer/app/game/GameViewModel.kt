@@ -4,6 +4,7 @@
 package org.chesstrainer.app.game
 
 import android.app.Application
+import android.content.ComponentCallbacks2
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlin.random.Random
@@ -100,9 +101,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         analysis.onBackground()
     }
 
-    fun onTrimMemory() {
+    fun onTrimMemory(level: Int) {
         controller.onTrimMemory()
-        analysis.onTrimMemory()
+        // Для аналізу значення лише `RUNNING_CRITICAL` (застосунок на екрані). Рівні «UI_HIDDEN» і вищі приходять
+        // при згортанні, коли аналіз уже зупинив `onBackground` і має відновитися після повернення.
+        @Suppress("DEPRECATION")
+        if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) analysis.onTrimMemory()
     }
 
     override fun onCleared() {

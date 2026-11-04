@@ -51,6 +51,6 @@ class MainActivity : ComponentActivity() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         @Suppress("DEPRECATION")
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) viewModel.onTrimMemory()
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) viewModel.onTrimMemory(level)
     }
 }
