@@ -44,6 +44,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       # Збірка, unit-тести всіх модулів, швидкий perft (CONTRACTS 7.1).
       - run: ./gradlew build
+      # Контрактні тести QA (CONTRACTS 7, v0.21) входять і до `build` (через `check`); окремий крок робить їх видимими в CI.
+      - name: Contract tests (QA)
+        run: ./gradlew :tests:contract:test
       # Перевірка навчального контенту (CONTRACTS 6.1, content/README.md): формат, легальність ходів, унікальність id,
       # джерела зі статусом «Перевірено»/«Власний» у docs/THIRD_PARTY.md. `--args` у Gradle замінює аргументи завдання,
       # тому шлях і реєстр повторено тут повністю (як у content/README.md).
