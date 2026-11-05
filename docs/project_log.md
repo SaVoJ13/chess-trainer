@@ -218,8 +218,8 @@
 
 ## Записи
 
-
 (додавайте нові записи зверху)
+
 ### 2026-11-05 Android і UI (сесія: рівень id 22 в UI)
 Що зроблено: виправлено CI гілки `feature/ladder-level-22` (`GameControllerTest.levelListAppearsOnceTheEngineReportsItsCapabilities` мав жорсткий список id без 22); рівень id 22 підключено до UI під назвою «Club 3» / «Клуб 3».
 Що змінено (файли/модулі): `app/.../ui/game/DifficultyNames.kt` (`22 -> R.string.difficulty_22`); `values/strings.xml` і `values-uk/strings.xml` (`difficulty_22`, поряд із `difficulty_21`); `GameControllerTest.kt:647` (список id: 1, 2, 3, 4, 5, 10, 11, 12, 20, 21, 22, 30, 31, 99). Гілка `feature/difficulty-22` від `feature/ladder-level-22`.
