@@ -23,6 +23,7 @@ internal fun difficultyNameRes(id: DifficultyId): Int? = when (id.value) {
     12 -> R.string.difficulty_12
     20 -> R.string.difficulty_20
     21 -> R.string.difficulty_21
+    22 -> R.string.difficulty_22
     30 -> R.string.difficulty_30
     31 -> R.string.difficulty_31
     99 -> R.string.difficulty_99

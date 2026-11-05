@@ -644,7 +644,7 @@ class GameControllerTest {
     fun levelListAppearsOnceTheEngineReportsItsCapabilities() = scenario {
         val s = await { it.levels != null }
         val ids = s.levels!!.map { it.id.value }
-        assertEquals(listOf(1, 2, 3, 4, 5, 10, 11, 12, 20, 21, 30, 31, 99), ids)
+        assertEquals(listOf(1, 2, 3, 4, 5, 10, 11, 12, 20, 21, 22, 30, 31, 99), ids)
     }
 
     @Test
