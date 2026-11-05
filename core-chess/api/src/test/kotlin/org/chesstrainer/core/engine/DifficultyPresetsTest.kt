@@ -19,7 +19,7 @@ class DifficultyPresetsTest {
             DifficultyIds.HANDICAP_1 to 1, DifficultyIds.HANDICAP_2 to 2, DifficultyIds.HANDICAP_3 to 3,
             DifficultyIds.HANDICAP_4 to 4, DifficultyIds.HANDICAP_5 to 5,
             DifficultyIds.ELO_MIN to 10, DifficultyIds.ELO_1500 to 11, DifficultyIds.ELO_1700 to 12,
-            DifficultyIds.ELO_1900 to 20, DifficultyIds.ELO_2100 to 21,
+            DifficultyIds.ELO_1900 to 20, DifficultyIds.ELO_2100 to 21, DifficultyIds.ELO_22 to 22,
             DifficultyIds.ELO_2400 to 30, DifficultyIds.ELO_2700 to 31,
             DifficultyIds.FULL to 99,
         )
@@ -63,12 +63,12 @@ class DifficultyPresetsTest {
     fun `byId gives null for an Elo level outside the engine eloRange`() {
         // Запит QA O-04: рівень, чий Elo не потрапляє в capabilities.eloRange, недоступний, а не підміняється.
         val narrow = caps.copy(eloRange = 1600..2200)
-        for (id in listOf(DifficultyIds.ELO_1500, DifficultyIds.ELO_2400, DifficultyIds.ELO_2700)) {
+        for (id in listOf(DifficultyIds.ELO_1500, DifficultyIds.ELO_22, DifficultyIds.ELO_2400, DifficultyIds.ELO_2700)) {
             assertNull("id ${id.value}", presets.byId(id, narrow))
         }
         assertEquals(DifficultyIds.ELO_1700, presets.byId(DifficultyIds.ELO_1700, narrow)?.id)
         val none = caps.copy(eloRange = null)
-        for (id in listOf(DifficultyIds.ELO_MIN, DifficultyIds.ELO_1500, DifficultyIds.ELO_2100)) {
+        for (id in listOf(DifficultyIds.ELO_MIN, DifficultyIds.ELO_1500, DifficultyIds.ELO_2100, DifficultyIds.ELO_22)) {
             assertNull("id ${id.value}", presets.byId(id, none))
         }
     }
@@ -142,6 +142,8 @@ class DifficultyPresetsTest {
             DifficultyIds.ELO_1700 to SearchLimit(nodes = 427_741, moveTimeMs = 1_500),
             DifficultyIds.ELO_1900 to SearchLimit(nodes = 524_630, moveTimeMs = 1_800),
             DifficultyIds.ELO_2100 to SearchLimit(nodes = 677_873, moveTimeMs = 2_400),
+            // v0.23 (HANDICAP.md розд. 11): рівень id 22, медіана вузлів за 900 мс.
+            DifficultyIds.ELO_22 to SearchLimit(nodes = 787_672, moveTimeMs = 2_700),
             // v0.22 (HANDICAP.md розд. 10): 2400 і 2700 теж на вузлах (медіани за 1000 і 1200 мс).
             DifficultyIds.ELO_2400 to SearchLimit(nodes = 791_420, moveTimeMs = 3_000),
             DifficultyIds.ELO_2700 to SearchLimit(nodes = 937_245, moveTimeMs = 3_600),
@@ -153,5 +155,23 @@ class DifficultyPresetsTest {
         for (level in presets.levels(caps).filter { it.strength is Strength.Elo }) {
             assertTrue("вузли ${level.id}", level.limit.nodes != null && level.limit.moveTimeMs != null)
         }
+    }
+
+    @Test
+    fun `level 22 sits between 2100 and 2400 in the list and is found by id`() {
+        // CONTRACTS v0.23, 3.5 п. 8: id 22 більший за 21, але менший за 30; порядок у списку за силою.
+        val levels = presets.levels(caps)
+        val ids = levels.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        val i21 = ids.indexOf(DifficultyIds.ELO_2100)
+        assertEquals(i21 + 1, ids.indexOf(DifficultyIds.ELO_22))
+        assertEquals(i21 + 2, ids.indexOf(DifficultyIds.ELO_2400))
+        val level = presets.byId(DifficultyId(22), caps)
+        assertEquals(DifficultyIds.ELO_22, level?.id)
+        assertEquals(DifficultyGroup.CLUB, level?.group)
+        val elo = (level?.strength as Strength.Elo).elo
+        assertEquals(DefaultDifficultyPresets.ELO_22_NOMINAL, elo)
+        assertEquals(elo, level.approxElo)
+        assertTrue(elo > 2100 && elo < 2400)
     }
 }

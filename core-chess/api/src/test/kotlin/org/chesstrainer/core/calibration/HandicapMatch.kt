@@ -65,6 +65,7 @@ fun main(args: Array<String>) {
 /** Учасник: `H1..H5` (крок Handicap), `E1320`/`E1500`/`E1700` (`UCI_Elo`; `E` = `E1320`), `R` (випадковий хід). */
 private fun sideName(side: String) = when {
     side == "E" -> "UCI_Elo 1320"
+    side == "E22" -> "UCI_Elo ${DefaultDifficultyPresets.ELO_22_NOMINAL} (id 22)"
     side.startsWith("E") -> "UCI_Elo ${side.substring(1)}"
     side == "R" -> "випадковий"
     side == "F" -> "Full"
@@ -74,11 +75,13 @@ private fun sideName(side: String) = when {
 /** Рівні `UCI_Elo`, доступні в матчах: значення -> `DifficultyId` пресета. */
 private val ELO_SIDES = linkedMapOf(
     1320 to DifficultyIds.ELO_MIN, 1500 to DifficultyIds.ELO_1500, 1700 to DifficultyIds.ELO_1700,
-    1900 to DifficultyIds.ELO_1900, 2100 to DifficultyIds.ELO_2100, 2400 to DifficultyIds.ELO_2400, 2700 to DifficultyIds.ELO_2700,
+    1900 to DifficultyIds.ELO_1900, 2100 to DifficultyIds.ELO_2100,
+    DefaultDifficultyPresets.ELO_22_NOMINAL to DifficultyIds.ELO_22, 2400 to DifficultyIds.ELO_2400, 2700 to DifficultyIds.ELO_2700,
 )
 
 private fun eloOf(side: String): Int? = when {
     side == "E" -> 1320
+    side == "E22" -> DefaultDifficultyPresets.ELO_22_NOMINAL
     side.startsWith("E") -> side.substring(1).toIntOrNull()
     else -> null
 }
@@ -112,11 +115,14 @@ private val ALL_PAIRS: Map<String, Pair<String, String>> = linkedMapOf(
     "E2400-E2100" to ("E2400" to "E2100"),
     "E2700-E2400" to ("E2700" to "E2400"),
     "F-E2700" to ("F" to "E2700"),
+    // Рівень id 22 (CONTRACTS v0.23): `E22` = UCI_Elo ELO_22_NOMINAL на вузлах.
+    "E22-E2100" to ("E22" to "E2100"),
+    "E2400-E22" to ("E2400" to "E22"),
 )
 
 private val LOCATOR_PAIRS = setOf(
     "E1320-1", "E1320-2", "E1320-3", "E1320-4", "E1500-5", "E1700-5", "E1500-E1320", "E1700-E1500", "E1900-E1700", "E2100-E1900",
-    "E2400-E2100", "E2700-E2400", "F-E2700",
+    "E2400-E2100", "E2700-E2400", "F-E2700", "E22-E2100", "E2400-E22",
 )
 
 /**
@@ -440,7 +446,7 @@ internal object MatchTool {
         val tracing = traceFile != null && g < traceGames
         val tracer = TraceEngine(engine)
         fun mover(side: String, slot: Int): (List<Uci>) -> Uci = when (side) {
-            "E", "E1320", "E1500", "E1700", "E1900", "E2100", "E2400", "E2700", "F" -> { moves ->
+            "E", "E1320", "E1500", "E1700", "E1900", "E2100", "E22", "E2400", "E2700", "F" -> { moves ->
                 val eloLevel = if (side == "F") checkNotNull(activeFull) else eloLevels.getValue(eloOf(side)!!)
                 val r = runBlocking { engine.bestMove(MoveRequest(Fen(CalibrationEnv.START_FEN), moves, eloLevel)) }
                 (r as? ChessResult.Ok)?.value?.best ?: error("UCI_Elo: ${(r as ChessResult.Err).error}")
