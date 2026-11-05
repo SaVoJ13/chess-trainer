@@ -91,7 +91,7 @@ class HandicapPolicyTest {
         val b300 = (1..HandicapPolicy.STEPS).map { step -> mix.map { probLoss(it, step, 300) }.average() }
         assertStrictlyDecreasing("B300", b300)
         assertTrue("step 1 B300 ${b300[0]}", b300[0] in 0.20..0.35)
-        assertTrue("step 5 B300 ${b300[4]}", b300[4] in 0.0..0.15) // цілі п. 4 (v0.21) лише на реальних позиціях, див. HANDICAP.md
+        assertTrue("step 5 B300 ${b300[4]}", b300[4] in 0.0..0.15) // цілі B300 (v0.20) перевіряє RealPositionMetricsTest на реальних позиціях, див. HANDICAP.md
         for (s in typical) assertStrictlyDecreasing("B300 $s", (1..HandicapPolicy.STEPS).map { probLoss(s, it, 300) })
     }
 
@@ -200,7 +200,7 @@ class HandicapPolicyTest {
         val miss1 = (1..20_000).count { chooseWith(s, 1, rng) != s[0].uci } / 20_000.0
         val miss5 = (1..20_000).count { chooseWith(s, 5, rng) != s[0].uci } / 20_000.0
         assertTrue("miss1 $miss1", miss1 in 0.3..0.7)
-        assertTrue("miss5 $miss5", miss5 < 0.25) // blind 18 % на кроці 5 (v0.21)
+        assertTrue("miss5 $miss5", miss5 < 0.35) // blind 250 ‰ на кроці 5 (профіль v0.4, HANDICAP.md розд. 3): пропуск ≈ 25 %
     }
 
     @Test
@@ -235,13 +235,24 @@ class HandicapPolicyTest {
     fun `profile parameters are monotone in step and step is range checked`() {
         val p = (1..HandicapPolicy.STEPS).map { HandicapPolicy.profile(it) }
         for (i in 1 until p.size) {
-            // T не монотонна: кроки з різною глибиною підбирались за метрикою на реальних позиціях (HANDICAP.md, розд. 4.1/9).
+            // Захист шкали (CONTRACTS 3.5 п. 7, v0.22): глибина не спадає; maxLoss, blind, ε не зростають;
+            // T строго спадає серед кроків однакової глибини (T між різними глибинами не монотонна: підбір за метрикою
+            // на реальних позиціях, HANDICAP.md розд. 4.1/9; її шкалу захищає RealPositionMetricsTest).
             assertTrue(p[i].temperatureCp > 0)
-            assertTrue(p[i].maxLossCp <= p[i - 1].maxLossCp)
-            assertTrue(p[i].blindSpotPermille < p[i - 1].blindSpotPermille)
-            assertTrue(p[i].randomMovePermille <= p[i - 1].randomMovePermille)
-            assertTrue(p[i].searchDepth >= p[i - 1].searchDepth)
+            assertTrue("depth $i", p[i].searchDepth >= p[i - 1].searchDepth)
+            assertTrue("maxLoss $i", p[i].maxLossCp <= p[i - 1].maxLossCp)
+            assertTrue("blind $i", p[i].blindSpotPermille <= p[i - 1].blindSpotPermille)
+            assertTrue("epsilon $i", p[i].randomMovePermille <= p[i - 1].randomMovePermille)
+            if (p[i].searchDepth == p[i - 1].searchDepth) {
+                assertTrue("T $i", p[i].temperatureCp < p[i - 1].temperatureCp)
+            }
         }
+        // Поточні значення (HANDICAP.md розд. 3): ловить випадкову зміну таблиці профілів.
+        assertEquals(listOf(193, 128, 148, 118, 108), p.map { it.temperatureCp })
+        assertEquals(listOf(1000, 900, 850, 800, 700), p.map { it.maxLossCp })
+        assertEquals(listOf(500, 400, 350, 300, 250), p.map { it.blindSpotPermille })
+        assertEquals(listOf(100, 70, 0, 0, 0), p.map { it.randomMovePermille })
+        assertEquals(listOf(1, 1, 2, 2, 3), p.map { it.searchDepth })
         for (step in 1..3) assertTrue("maxLoss step $step", p[step - 1].maxLossCp >= 300)
         assertTrue(HandicapPolicy.STEPS >= 3)
         assertFailsWith<IllegalArgumentException> { HandicapPolicy.profile(0) }

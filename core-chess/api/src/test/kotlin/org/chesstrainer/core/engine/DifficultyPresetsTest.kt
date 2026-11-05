@@ -60,6 +60,20 @@ class DifficultyPresetsTest {
     }
 
     @Test
+    fun `byId gives null for an Elo level outside the engine eloRange`() {
+        // Запит QA O-04: рівень, чий Elo не потрапляє в capabilities.eloRange, недоступний, а не підміняється.
+        val narrow = caps.copy(eloRange = 1600..2200)
+        for (id in listOf(DifficultyIds.ELO_1500, DifficultyIds.ELO_2400, DifficultyIds.ELO_2700)) {
+            assertNull("id ${id.value}", presets.byId(id, narrow))
+        }
+        assertEquals(DifficultyIds.ELO_1700, presets.byId(DifficultyIds.ELO_1700, narrow)?.id)
+        val none = caps.copy(eloRange = null)
+        for (id in listOf(DifficultyIds.ELO_MIN, DifficultyIds.ELO_1500, DifficultyIds.ELO_2100)) {
+            assertNull("id ${id.value}", presets.byId(id, none))
+        }
+    }
+
+    @Test
     fun `without an Elo option no Elo levels are offered`() {
         val levels = presets.levels(caps.copy(eloRange = null))
         assertTrue(levels.none { it.strength is Strength.Elo })
@@ -128,14 +142,16 @@ class DifficultyPresetsTest {
             DifficultyIds.ELO_1700 to SearchLimit(nodes = 427_741, moveTimeMs = 1_500),
             DifficultyIds.ELO_1900 to SearchLimit(nodes = 524_630, moveTimeMs = 1_800),
             DifficultyIds.ELO_2100 to SearchLimit(nodes = 677_873, moveTimeMs = 2_400),
+            // v0.22 (HANDICAP.md розд. 10): 2400 і 2700 теж на вузлах (медіани за 1000 і 1200 мс).
+            DifficultyIds.ELO_2400 to SearchLimit(nodes = 791_420, moveTimeMs = 3_000),
+            DifficultyIds.ELO_2700 to SearchLimit(nodes = 937_245, moveTimeMs = 3_600),
         )
         for ((id, limit) in expected) assertEquals("ліміт $id", limit, presets.byId(id, caps)?.limit)
+        // Full лишається на часі (CONTRACTS 3.5 п. 8, v0.22): «максимум цього пристрою».
         assertEquals(SearchLimit(moveTimeMs = 1500), presets.byId(DifficultyIds.FULL, caps)?.limit)
-        // Рівні без виміряних вузлів лишаються на часі.
-        for (id in listOf(DifficultyIds.ELO_2400, DifficultyIds.ELO_2700)) {
-            val l = presets.byId(id, caps)?.limit
-            assertNull(l?.nodes)
-            assertTrue(l?.moveTimeMs != null)
+        // Усі рівні UCI_Elo мають вузли й стелю часу рівно 3 × час пресета.
+        for (level in presets.levels(caps).filter { it.strength is Strength.Elo }) {
+            assertTrue("вузли ${level.id}", level.limit.nodes != null && level.limit.moveTimeMs != null)
         }
     }
 }

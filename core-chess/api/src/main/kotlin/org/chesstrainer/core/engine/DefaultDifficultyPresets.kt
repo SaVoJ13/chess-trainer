@@ -109,7 +109,7 @@ class DefaultDifficultyPresets : DifficultyPresets {
         EloStep(DifficultyIds.ELO_1700, 1700, 500, 427_741, 300, DifficultyGroup.AMATEUR),
         EloStep(DifficultyIds.ELO_1900, 1900, 600, 524_630, 250, DifficultyGroup.CLUB),
         EloStep(DifficultyIds.ELO_2100, 2100, 800, 677_873, 200, DifficultyGroup.CLUB),
-        EloStep(DifficultyIds.ELO_2400, 2400, 1000, null, 150, DifficultyGroup.STRONG),
-        EloStep(DifficultyIds.ELO_2700, 2700, 1200, null, 100, DifficultyGroup.STRONG),
+        EloStep(DifficultyIds.ELO_2400, 2400, 1000, 791_420, 150, DifficultyGroup.STRONG),
+        EloStep(DifficultyIds.ELO_2700, 2700, 1200, 937_245, 100, DifficultyGroup.STRONG),
     )
 }

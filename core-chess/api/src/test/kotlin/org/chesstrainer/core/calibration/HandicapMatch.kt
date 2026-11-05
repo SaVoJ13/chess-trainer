@@ -67,13 +67,14 @@ private fun sideName(side: String) = when {
     side == "E" -> "UCI_Elo 1320"
     side.startsWith("E") -> "UCI_Elo ${side.substring(1)}"
     side == "R" -> "випадковий"
+    side == "F" -> "Full"
     else -> "Крок ${side.substring(1, 2)}"
 }
 
 /** Рівні `UCI_Elo`, доступні в матчах: значення -> `DifficultyId` пресета. */
 private val ELO_SIDES = linkedMapOf(
     1320 to DifficultyIds.ELO_MIN, 1500 to DifficultyIds.ELO_1500, 1700 to DifficultyIds.ELO_1700,
-    1900 to DifficultyIds.ELO_1900, 2100 to DifficultyIds.ELO_2100,
+    1900 to DifficultyIds.ELO_1900, 2100 to DifficultyIds.ELO_2100, 2400 to DifficultyIds.ELO_2400, 2700 to DifficultyIds.ELO_2700,
 )
 
 private fun eloOf(side: String): Int? = when {
@@ -107,11 +108,25 @@ private val ALL_PAIRS: Map<String, Pair<String, String>> = linkedMapOf(
     "E1700-E1500" to ("E1700" to "E1500"),
     "E1900-E1700" to ("E1900" to "E1700"),
     "E2100-E1900" to ("E2100" to "E1900"),
+    // Верхні пари (CONTRACTS v0.22, 3.5 п. 8): `F` = Full (ліміт часу пресета), `E2400`/`E2700` на вузлах.
+    "E2400-E2100" to ("E2400" to "E2100"),
+    "E2700-E2400" to ("E2700" to "E2400"),
+    "F-E2700" to ("F" to "E2700"),
 )
 
 private val LOCATOR_PAIRS = setOf(
     "E1320-1", "E1320-2", "E1320-3", "E1320-4", "E1500-5", "E1700-5", "E1500-E1320", "E1700-E1500", "E1900-E1700", "E2100-E1900",
+    "E2400-E2100", "E2700-E2400", "F-E2700",
 )
+
+/**
+ * Набір дебютів для матчів: типово 24 дебюти виміру ([Openings.lines]); `--openings confirm` це інші 24 дебюти
+ * ([Openings.confirm]) для підтвердного прогону (CONTRACTS v0.22, 3.5 п. 8).
+ */
+@Volatile private var openingSetName = "main"
+/** Рівень `Full` (ліміт часу пресета, не вузли: CONTRACTS v0.22, 3.5 п. 8) для пар із стороною `F`. */
+@Volatile private var activeFull: DifficultyLevel? = null
+private fun activeOpenings(): List<String> = if (openingSetName == "confirm") Openings.confirm else Openings.lines
 
 private val DEFAULT_PAIRS = listOf("1-2", "2-3", "3-4", "4-5", "E-5")
 
@@ -225,8 +240,10 @@ internal object MatchTool {
         lockReminder(env, 60)
         val presets = DefaultDifficultyPresets()
         val engine = env.newEngine(AnalysisCache(null, retain = false))
-        val level = presets.byId(ELO_SIDES[elo] ?: error("Немає пресета UCI_Elo $elo (є ${ELO_SIDES.keys})"), engine.capabilities!!)!!
-        val ms = level.limit.moveTimeMs ?: error("пресет мін. UCI_Elo без ліміту в часі")
+        val level0 = presets.byId(ELO_SIDES[elo] ?: error("Немає пресета UCI_Elo $elo (є ${ELO_SIDES.keys})"), engine.capabilities!!)!!
+        // Пресет з вузлами має стелю 3 × час пресета; вимір вузлів іде за часом пресета без ліміту вузлів.
+        val ms = (level0.limit.moveTimeMs ?: error("пресет UCI_Elo без ліміту в часі")).let { if (level0.limit.nodes != null) it / 3 else it }
+        val level = level0.copy(limit = SearchLimit(moveTimeMs = ms))
         val games = Games(env).load()
         val fens = games.flatMap { g -> (10..minOf(50, g.moves.size - 1) step 2).map { Games(env).fenAt(g, it) } }
             .distinct().let { list -> val r = Random(20261101); list.shuffled(r).take(NODE_SAMPLES) }
@@ -263,6 +280,7 @@ internal object MatchTool {
         val workers = opts["workers"]?.toInt() ?: 4
         val seed = opts["seed"]?.toLong() ?: 20261101L
         val maxPlies = opts["max-plies"]?.toInt() ?: 300
+        opts["openings"]?.let { require(it == "main" || it == "confirm") { "--openings main|confirm" }; openingSetName = it }
         opts["trace"]?.let { traceFile = File(dir, "trace.tsv"); traceGames = it.toInt() }
         val pairKeys = (opts["pairs"] ?: DEFAULT_PAIRS.joinToString(",")).split(',').map { it.trim() }
         pairKeys.forEach { require(it in ALL_PAIRS) { "Невідома пара $it (є ${ALL_PAIRS.keys})" } }
@@ -275,6 +293,8 @@ internal object MatchTool {
             presets.byId(ELO_SIDES.getValue(elo), caps)!!.let { it.copy(limit = SearchLimit(nodes = nodesByElo.getValue(elo))) }
         }
         val handicapLevels = (1..HandicapPolicy.STEPS).associate { "H$it" to presets.byId(DifficultyIds.all[it - 1], caps)!! }
+        val fullLevel = presets.byId(DifficultyIds.FULL, caps)!!
+        activeFull = fullLevel
         runBlocking { probe.stop() }
 
         // Конфіг: повторний запуск з іншими параметрами не змішує результати. `games` можна збільшувати.
@@ -286,7 +306,8 @@ internal object MatchTool {
             handicapLevels.forEach { (k, l) ->
                 appendLine("$k=${HandicapPolicy.profile(k.substring(1).toInt())} limit=${l.limit}")
             }
-            appendLine("openings=${Openings.lines.size}")
+            appendLine("openings=${activeOpenings().size}" + if (openingSetName == "main") "" else " set=$openingSetName")
+            if (pairKeys.any { "F" in ALL_PAIRS.getValue(it).toList() }) appendLine("F=${fullLevel.strength} limit=${fullLevel.limit}")
         }
         val cfgFile = File(dir, "config.txt")
         if (cfgFile.isFile) check(cfgFile.readText() == config) {
@@ -412,15 +433,15 @@ internal object MatchTool {
         strong: String, weak: String, handicapLevels: Map<String, DifficultyLevel>, eloLevels: Map<Int, DifficultyLevel>,
         seed: Long, maxPlies: Int, tempC: String, activity: AtomicLong,
     ): GameRecord {
-        val opening = (g / 2) % Openings.lines.size // пари партій (g, g+1) грають той самий дебют зі зміною кольорів
+        val opening = (g / 2) % activeOpenings().size // пари партій (g, g+1) грають той самий дебют зі зміною кольорів
         val strongWhite = g % 2 == 0
         val pairIndex = ALL_PAIRS.keys.indexOf(pairKey)
         fun rnd(slot: Int) = Random(seed * 1_000_003 + pairIndex * 100_003L + g * 2L + slot)
         val tracing = traceFile != null && g < traceGames
         val tracer = TraceEngine(engine)
         fun mover(side: String, slot: Int): (List<Uci>) -> Uci = when (side) {
-            "E", "E1320", "E1500", "E1700", "E1900", "E2100" -> { moves ->
-                val eloLevel = eloLevels.getValue(eloOf(side)!!)
+            "E", "E1320", "E1500", "E1700", "E1900", "E2100", "E2400", "E2700", "F" -> { moves ->
+                val eloLevel = if (side == "F") checkNotNull(activeFull) else eloLevels.getValue(eloOf(side)!!)
                 val r = runBlocking { engine.bestMove(MoveRequest(Fen(CalibrationEnv.START_FEN), moves, eloLevel)) }
                 (r as? ChessResult.Ok)?.value?.best ?: error("UCI_Elo: ${(r as ChessResult.Err).error}")
             }
@@ -459,7 +480,7 @@ internal object MatchTool {
             game = (game.play(move) as? ChessResult.Ok)?.value ?: error("Партію завершено перед ходом ${uci.value}")
             played += uci
         }
-        Openings.lines[opening].split(' ').forEach { apply(Uci(it)) }
+        activeOpenings()[opening].split(' ').forEach { apply(Uci(it)) }
 
         var outcome: String? = null
         var reason = ""
@@ -538,7 +559,7 @@ internal object MatchTool {
         out.appendLine()
         val temps = records.mapNotNull { it.tempC.toDoubleOrNull() }
         out.appendLine(
-            "Партій усього: ${records.size}; дебютів: ${records.map { it.opening }.distinct().size} з ${Openings.lines.size}; " +
+            "Партій усього: ${records.size}; дебютів: ${records.map { it.opening }.distinct().size} з ${activeOpenings().size}; " +
                 "температура батареї на початку партій: " +
                 (if (temps.isEmpty()) "—" else "${f1(temps.min())}–${f1(temps.max())} °C (середня ${f1(temps.average())}); журнал battery.log"),
         )
