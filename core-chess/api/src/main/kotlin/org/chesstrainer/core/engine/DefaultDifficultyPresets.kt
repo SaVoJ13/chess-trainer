@@ -21,6 +21,9 @@ object DifficultyIds {
     val ELO_1700 = DifficultyId(12)
     val ELO_1900 = DifficultyId(20)
     val ELO_2100 = DifficultyId(21)
+
+    /** Проміжний рівень між 2100 і 2400 (CONTRACTS v0.23, 3.5 п. 8): id 22, але в списку за силою між 21 і 30. */
+    val ELO_22 = DifficultyId(22)
     val ELO_2400 = DifficultyId(30)
     val ELO_2700 = DifficultyId(31)
 
@@ -29,7 +32,7 @@ object DifficultyIds {
     /** Усі коли-небудь видані значення, для тесту стабільності. */
     val all: List<DifficultyId> = listOf(
         HANDICAP_1, HANDICAP_2, HANDICAP_3, HANDICAP_4, HANDICAP_5,
-        ELO_MIN, ELO_1500, ELO_1700, ELO_1900, ELO_2100, ELO_2400, ELO_2700, FULL,
+        ELO_MIN, ELO_1500, ELO_1700, ELO_1900, ELO_2100, ELO_22, ELO_2400, ELO_2700, FULL,
     )
 }
 
@@ -103,12 +106,18 @@ class DefaultDifficultyPresets : DifficultyPresets {
         val group: DifficultyGroup,
     )
 
+    companion object {
+        /** Номінальне `UCI_Elo` рівня id 22 (підібрано матчами, `HANDICAP.md` розд. 11). */
+        const val ELO_22_NOMINAL = 2250
+    }
+
     private val eloSteps = listOf(
         EloStep(DifficultyIds.ELO_MIN, null, 300, 267_319, 400, DifficultyGroup.AMATEUR),
         EloStep(DifficultyIds.ELO_1500, 1500, 400, 347_779, 350, DifficultyGroup.AMATEUR),
         EloStep(DifficultyIds.ELO_1700, 1700, 500, 427_741, 300, DifficultyGroup.AMATEUR),
         EloStep(DifficultyIds.ELO_1900, 1900, 600, 524_630, 250, DifficultyGroup.CLUB),
         EloStep(DifficultyIds.ELO_2100, 2100, 800, 677_873, 200, DifficultyGroup.CLUB),
+        EloStep(DifficultyIds.ELO_22, ELO_22_NOMINAL, 900, 787_672, 175, DifficultyGroup.CLUB),
         EloStep(DifficultyIds.ELO_2400, 2400, 1000, 791_420, 150, DifficultyGroup.STRONG),
         EloStep(DifficultyIds.ELO_2700, 2700, 1200, 937_245, 100, DifficultyGroup.STRONG),
     )
