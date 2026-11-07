@@ -15,6 +15,8 @@ aboutLibraries {
     collect {
         fetchRemoteLicense = false
         fetchRemoteFunding = false
+        // Ручні доповнення, коли POM не містить даних (THIRD_PARTY, правило 12): chesslib (SW-002) без <licenses>.
+        configPath = file("licenses/config")
     }
     export {
         outputFile = file("licenses/aboutlibraries.json")
@@ -113,6 +115,23 @@ val prepareContentAssets by tasks.registering(Sync::class) {
     into(contentAssetsDir.map { it.dir("content/common") })
 }
 android.sourceSets.getByName("main").assets.directories.add(contentAssetsDir.get().asFile.path)
-// Каталог згенерований, тому його читачі (злиття assets і перевірки lint) явно залежать від копіювання.
+
+// Дані екрана «Відкриті ліцензії» (CONTRACTS 5.1): згенерований звіт бібліотек, каталог компонентів, тексти ліцензій
+// і повний текст GPL-3.0 з файлу LICENSE репозиторію (не копія вручну). Усе лежить у застосунку, мережа не потрібна.
+val licenseAssetsDir = layout.buildDirectory.dir("generated/licenseAssets")
+val prepareLicenseAssets by tasks.registering(Sync::class) {
+    from(layout.projectDirectory.dir("licenses")) {
+        include("aboutlibraries.json", "components.json", "texts/*.txt")
+    }
+    from(rootProject.layout.projectDirectory.file("LICENSE")) {
+        rename { "GPL-3.0.txt" }
+    }
+    into(licenseAssetsDir.map { it.dir("licenses") })
+    // Звіт генерує окреме завдання (CI запускає його окремим кроком); якщо обидва в одному запуску, копіювання йде після нього.
+    mustRunAfter("exportLibraryDefinitionsRelease")
+}
+android.sourceSets.getByName("main").assets.directories.add(licenseAssetsDir.get().asFile.path)
+
+// Каталоги згенеровані, тому їхні читачі (злиття assets і перевірки lint) явно залежать від копіювання.
 tasks.matching { (it.name.startsWith("merge") && it.name.endsWith("Assets")) || it.name.contains("lint", ignoreCase = true) }
-    .configureEach { dependsOn(prepareContentAssets) }
+    .configureEach { dependsOn(prepareContentAssets, prepareLicenseAssets) }

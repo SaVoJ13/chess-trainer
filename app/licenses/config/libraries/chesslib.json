@@ -1,0 +1,11 @@
+{
+    "uniqueId": "com.github.bhlangonijr:chesslib",
+    "name": "chesslib",
+    "description": "Chess library: move generation, FEN, SAN (THIRD_PARTY SW-002)",
+    "website": "https://github.com/bhlangonijr/chesslib",
+    "developers": [
+        { "name": "bhlangonijr" }
+    ],
+    "scm": { "url": "https://github.com/bhlangonijr/chesslib" },
+    "licenses": ["Apache-2.0"]
+}

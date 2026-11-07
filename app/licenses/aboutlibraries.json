@@ -1464,13 +1464,19 @@
         {
             "uniqueId": "com.github.bhlangonijr:chesslib",
             "artifactVersion": "1.3.7",
-            "name": "com.github.bhlangonijr:chesslib",
-            "description": "",
+            "name": "chesslib",
+            "description": "Chess library: move generation, FEN, SAN (THIRD_PARTY SW-002)",
+            "website": "https://github.com/bhlangonijr/chesslib",
             "developers": [
-                
+                {
+                    "name": "bhlangonijr"
+                }
             ],
+            "scm": {
+                "url": "https://github.com/bhlangonijr/chesslib"
+            },
             "licenses": [
-                
+                "Apache-2.0"
             ],
             "funding": [
                 

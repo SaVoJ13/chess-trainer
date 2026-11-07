@@ -1,0 +1,79 @@
+{
+    "schema": 1,
+    "app": {
+        "license": "GPL-3.0-or-later",
+        "copyright": "Chess Trainer contributors",
+        "source": "https://github.com/SaVoJ13/chess-trainer"
+    },
+    "native": [
+        {
+            "id": "SW-001",
+            "name": "Stockfish",
+            "version": "sf_19",
+            "authors": "The Stockfish developers",
+            "license": "GPL-3.0-or-later",
+            "texts": ["GPL-3.0"],
+            "source": "https://github.com/official-stockfish/Stockfish/tree/sf_19",
+            "links": [
+                "https://github.com/official-stockfish/Stockfish/blob/sf_19/AUTHORS",
+                "https://github.com/SaVoJ13/chess-trainer/tree/main/core-chess/engine-android/src/main/cpp/stockfish"
+            ],
+            "notes": ["stockfish_source"]
+        },
+        {
+            "id": "SW-008",
+            "name": "nn-1a298aa575a0.nnue",
+            "version": "Stockfish sf_19",
+            "authors": "The Stockfish developers",
+            "license": "CC0-1.0",
+            "texts": [],
+            "source": "https://github.com/official-stockfish/networks",
+            "links": [
+                "https://storage.lczero.org/files/training_data",
+                "https://opendatacommons.org/licenses/odbl/odbl-10.txt"
+            ],
+            "notes": ["nnue_lc0"]
+        },
+        {
+            "id": "SW-018",
+            "name": "libc++ / libc++abi",
+            "version": "Android NDK 30.0.16248370",
+            "authors": "The LLVM Project",
+            "license": "Apache-2.0 WITH LLVM-exception",
+            "texts": ["Apache-2.0", "LLVM-exception"],
+            "source": "https://github.com/llvm/llvm-project",
+            "links": [],
+            "notes": ["libcxx_static"]
+        }
+    ],
+    "content": [
+        {
+            "id": "CT-001",
+            "name": "Lichess puzzle database (subset)",
+            "version": "2026-11-01",
+            "authors": "Lichess contributors",
+            "license": "CC0-1.0",
+            "texts": [],
+            "source": "https://database.lichess.org/#puzzles",
+            "links": [],
+            "notes": ["puzzles_data_only"]
+        }
+    ],
+    "pieceSets": [
+        {
+            "id": "AS-007",
+            "name": "chess_trainer",
+            "version": "",
+            "authors": "Chess Trainer contributors",
+            "license": "GPL-3.0-or-later",
+            "texts": ["GPL-3.0"],
+            "source": "https://github.com/SaVoJ13/chess-trainer/blob/main/app/src/main/kotlin/org/chesstrainer/app/ui/game/PieceShapes.kt",
+            "links": [],
+            "converted": false,
+            "notes": ["own_pieces"]
+        }
+    ],
+    "notices": {
+        "org.apache.commons:commons-lang3": "NOTICE-commons-lang3"
+    }
+}
