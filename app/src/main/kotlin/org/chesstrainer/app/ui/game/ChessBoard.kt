@@ -39,7 +39,8 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import org.chesstrainer.app.R
 import org.chesstrainer.app.game.GameUiState
-import org.chesstrainer.app.ui.theme.BoardColors
+import org.chesstrainer.app.ui.theme.BoardPalette
+import org.chesstrainer.app.ui.theme.LocalBoardPalette
 import org.chesstrainer.core.model.Color as ChessColor
 import org.chesstrainer.core.model.Move
 import org.chesstrainer.core.model.Piece
@@ -86,6 +87,7 @@ fun ChessBoard(
     modifier: Modifier = Modifier,
 ) {
     val bottom = state.bottomColor
+    val palette = LocalBoardPalette.current
     val textMeasurer = rememberTextMeasurer()
     val touchSlop = LocalViewConfiguration.current.touchSlop
     val tap by rememberUpdatedState(onSquareTap)
@@ -128,7 +130,7 @@ fun ChessBoard(
                     }
                 },
         ) {
-            drawBoard(state, bottom, drag, textMeasurer)
+            drawBoard(state, bottom, drag, textMeasurer, palette)
         }
         SquareSemantics(state, bottom, onSquareTap)
     }
@@ -148,7 +150,7 @@ private fun cellOrigin(square: Square, cell: Float, bottom: ChessColor): Offset 
     return Offset(column * cell, row * cell)
 }
 
-private fun DrawScope.drawBoard(state: BoardView, bottom: ChessColor, drag: Drag?, textMeasurer: TextMeasurer) {
+private fun DrawScope.drawBoard(state: BoardView, bottom: ChessColor, drag: Drag?, textMeasurer: TextMeasurer, palette: BoardPalette) {
     val cell = size.width / 8f
     val cellSize = Size(cell, cell)
     val position = state.position
@@ -159,13 +161,13 @@ private fun DrawScope.drawBoard(state: BoardView, bottom: ChessColor, drag: Drag
             val square = Square.of(file, rank)
             val origin = cellOrigin(square, cell, bottom)
             val isLight = (file + rank) % 2 == 1
-            drawRect(if (isLight) BoardColors.lightSquare else BoardColors.darkSquare, origin, cellSize)
+            drawRect(if (isLight) palette.lightSquare else palette.darkSquare, origin, cellSize)
             if (last != null && (square == last.from || square == last.to)) {
-                drawRect(BoardColors.lastMove, origin, cellSize)
+                drawRect(palette.lastMove.on(isLight), origin, cellSize)
             }
-            if (square == state.selected) drawRect(BoardColors.selected, origin, cellSize)
+            if (square == state.selected) drawRect(palette.selected.on(isLight), origin, cellSize)
             if (square == state.checkSquare) {
-                drawCircle(BoardColors.check, radius = cell * 0.46f, center = origin + Offset(cell / 2, cell / 2))
+                drawCircle(palette.check.on(isLight), radius = cell * 0.46f, center = origin + Offset(cell / 2, cell / 2))
             }
         }
     }
@@ -179,13 +181,13 @@ private fun DrawScope.drawBoard(state: BoardView, bottom: ChessColor, drag: Drag
         val fileOrigin = cellOrigin(bottomSquare, cell, bottom)
         drawText(
             textMeasurer, fileLetter, fileOrigin + Offset(cell * 0.76f, cell * 0.72f),
-            label.copy(color = if (onLight) BoardColors.coordinateOnLight else BoardColors.coordinateOnDark),
+            label.copy(color = if (onLight) palette.coordinateOnLight else palette.coordinateOnDark),
         )
         val leftSquare = if (bottom == ChessColor.WHITE) Square.of(0, 7 - i) else Square.of(7, i)
         val rankOnLight = (leftSquare.file + leftSquare.rank) % 2 == 1
         drawText(
             textMeasurer, (leftSquare.rank + 1).toString(), cellOrigin(leftSquare, cell, bottom) + Offset(cell * 0.06f, cell * 0.03f),
-            label.copy(color = if (rankOnLight) BoardColors.coordinateOnLight else BoardColors.coordinateOnDark),
+            label.copy(color = if (rankOnLight) palette.coordinateOnLight else palette.coordinateOnDark),
         )
     }
 
@@ -200,9 +202,9 @@ private fun DrawScope.drawBoard(state: BoardView, bottom: ChessColor, drag: Drag
     state.targets.forEach { target ->
         val center = cellOrigin(target, cell, bottom) + Offset(cell / 2, cell / 2)
         if (position.pieceAt(target) == null) {
-            drawCircle(BoardColors.targetHint, radius = cell * 0.16f, center = center)
+            drawCircle(palette.targetHint, radius = cell * 0.16f, center = center)
         } else {
-            drawCircle(BoardColors.targetHint, radius = cell * 0.46f, center = center, style = Stroke(width = cell * 0.09f))
+            drawCircle(palette.targetHint, radius = cell * 0.46f, center = center, style = Stroke(width = cell * 0.09f))
         }
     }
 

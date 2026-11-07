@@ -28,18 +28,6 @@ private val DarkColors = darkColorScheme(
     surface = Color(0xFF15181B),
 )
 
-/** Кольори дошки: власна приглушена синьо-сіра палітра, однакова у світлій і темній темі. */
-object BoardColors {
-    val lightSquare = Color(0xFFDDE4EB)
-    val darkSquare = Color(0xFF7F97AE)
-    val lastMove = Color(0x66E8C547)
-    val selected = Color(0x8855A67A)
-    val targetHint = Color(0x55233545)
-    val check = Color(0xCCD9453D)
-    val coordinateOnLight = Color(0xFF5E7388)
-    val coordinateOnDark = Color(0xFFEAF0F5)
-}
-
 @Composable
 fun ChessTheme(content: @Composable () -> Unit) {
     MaterialTheme(

@@ -19,6 +19,7 @@ import org.chesstrainer.app.game.GameViewModel
 import org.chesstrainer.core.game.ChessGame
 import org.chesstrainer.app.review.GamesViewModel
 import org.chesstrainer.app.review.ReviewSlot
+import org.chesstrainer.app.settings.Appearance
 import org.chesstrainer.app.storage.GameId
 import org.chesstrainer.app.storage.GameMode
 import org.chesstrainer.app.puzzle.PuzzleController
@@ -49,7 +50,13 @@ private enum class Screen { GAME, GAMES, REVIEW, PUZZLES, ANALYSIS, SETTINGS, AB
  * тримає [GameController], тому перехід на список і назад його не губить.
  */
 @Composable
-fun AppNavigation(viewModel: GameViewModel, games: GamesViewModel, puzzles: () -> PuzzleController) {
+fun AppNavigation(
+    viewModel: GameViewModel,
+    games: GamesViewModel,
+    puzzles: () -> PuzzleController,
+    appearance: Appearance,
+    onAppearanceChange: (Appearance) -> Unit,
+) {
     val controller = viewModel.controller
     var screen by rememberSaveable { mutableStateOf(Screen.GAME) }
     var analysisReturn by rememberSaveable { mutableStateOf(Screen.GAME) }
@@ -94,6 +101,8 @@ fun AppNavigation(viewModel: GameViewModel, games: GamesViewModel, puzzles: () -
         )
         Screen.ANALYSIS -> AnalysisScreen(viewModel.analysis, onBack = ::closeAnalysis)
         Screen.SETTINGS -> SettingsScreen(
+            appearance = appearance,
+            onBoardThemeChange = { onAppearanceChange(appearance.copy(boardTheme = it)) },
             onBack = { screen = Screen.GAME },
             onOpenAbout = { screen = Screen.ABOUT },
             onOpenLicenses = { licensesReturn = Screen.SETTINGS; screen = Screen.LICENSES },

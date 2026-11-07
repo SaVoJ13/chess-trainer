@@ -270,6 +270,12 @@
     <string name="settings_item_about_summary">Версія, ліцензія, вихідний код</string>
     <string name="settings_item_licenses">Відкриті ліцензії</string>
     <string name="settings_item_licenses_summary">Ліцензії та авторство всього, що є в застосунку</string>
+    <string name="settings_group_board_theme">Тема дошки</string>
+    <string name="settings_board_theme_hint">Кольори дошки в грі, перегляді партій, аналізі й задачах.</string>
+    <string name="board_theme_slate">Сланцева (за замовчуванням)</string>
+    <string name="board_theme_brown">Коричнева</string>
+    <string name="board_theme_green">Зелена</string>
+    <string name="board_theme_high_contrast">Висока контрастність</string>
     <string name="about_title">Про застосунок</string>
     <string name="about_description">Вільний шаховий тренер з відкритим кодом. Працює без інтернету.</string>
     <string name="about_version">Версія %1$s</string>

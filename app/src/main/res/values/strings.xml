@@ -268,6 +268,12 @@
     <string name="settings_item_about_summary">Version, license, source code</string>
     <string name="settings_item_licenses">Open-source licenses</string>
     <string name="settings_item_licenses_summary">Licenses and credits for everything inside the app</string>
+    <string name="settings_group_board_theme">Board theme</string>
+    <string name="settings_board_theme_hint">Colors of the board in every game, review, analysis and puzzle.</string>
+    <string name="board_theme_slate">Slate (default)</string>
+    <string name="board_theme_brown">Brown</string>
+    <string name="board_theme_green">Green</string>
+    <string name="board_theme_high_contrast">High contrast</string>
     <string name="about_title">About the app</string>
     <string name="about_description">A free, open-source chess trainer. It works without an internet connection.</string>
     <string name="about_version">Version %1$s</string>

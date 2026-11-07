@@ -70,7 +70,7 @@ import org.chesstrainer.app.game.GameOutcome
 import org.chesstrainer.app.game.GameUiState
 import org.chesstrainer.app.game.displayedApproxElo
 import org.chesstrainer.app.game.groupedByGroup
-import org.chesstrainer.app.ui.theme.BoardColors
+import org.chesstrainer.app.ui.theme.LocalBoardPalette
 import org.chesstrainer.core.engine.DifficultyId
 import org.chesstrainer.core.engine.DifficultyLevel
 import org.chesstrainer.core.game.AutoDrawReason
@@ -499,6 +499,7 @@ private fun LevelList(
 
 @Composable
 internal fun PromotionDialog(color: ChessColor, onChoose: (PieceType) -> Unit, onDismiss: () -> Unit) {
+    val squareColor = LocalBoardPalette.current.darkSquare
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.game_promotion_title)) },
@@ -511,7 +512,7 @@ internal fun PromotionDialog(color: ChessColor, onChoose: (PieceType) -> Unit, o
                         Modifier
                             .size(52.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(BoardColors.darkSquare)
+                            .background(squareColor)
                             .clickable(role = Role.Button) { onChoose(type) }
                             .semantics { contentDescription = name },
                     ) {

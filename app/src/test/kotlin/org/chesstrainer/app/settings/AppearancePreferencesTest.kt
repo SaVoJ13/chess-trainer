@@ -47,6 +47,38 @@ class AppearancePreferencesTest {
     }
 
     @Test
+    fun everyBoardThemeIsStoredAndReadBack() {
+        for (id in listOf("slate", "brown", "green", "high_contrast")) {
+            val store = FakePrefs()
+            val prefs = SharedPrefsAppearancePreferences(store)
+            prefs.update(prefs.current().copy(boardTheme = BoardThemeId(id)))
+            assertEquals(id, prefs.current().boardTheme.value)
+            assertEquals(id, store.values["board_theme_id"])
+            assertEquals(BoardThemeId(id), SharedPrefsAppearancePreferences(store).current().boardTheme)
+        }
+    }
+
+    @Test
+    fun unknownBoardThemeInUpdateAndStoreReadsAsSlate() {
+        val store = FakePrefs(mapOf(SharedPrefsAppearancePreferences.KEY_BOARD_THEME to "neon"))
+        val prefs = SharedPrefsAppearancePreferences(store)
+        assertEquals(BoardThemeId("slate"), prefs.current().boardTheme)
+        prefs.update(Appearance(boardTheme = BoardThemeId("high_contrast")))
+        prefs.update(Appearance(boardTheme = BoardThemeId("neon")))
+        assertEquals(BoardThemeId("slate"), prefs.current().boardTheme)
+        assertEquals(BoardThemeId("slate"), SharedPrefsAppearancePreferences(store).current().boardTheme)
+    }
+
+    @Test
+    fun boardThemeChangeKeepsOtherAppearanceValues() {
+        val prefs = SharedPrefsAppearancePreferences(FakePrefs())
+        prefs.update(Appearance(animateMoves = false))
+        prefs.update(prefs.current().copy(boardTheme = BoardThemeId("green")))
+        assertFalse(prefs.current().animateMoves)
+        assertEquals("chess_trainer", prefs.current().pieceSet.value)
+    }
+
+    @Test
     fun sameFileAsDifficultyPreferences() {
         assertEquals("settings", SharedPrefsAppearancePreferences.FILE_NAME)
     }

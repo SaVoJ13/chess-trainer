@@ -35,12 +35,14 @@ interface AppearancePreferences {
 
 /**
  * Значення, які застосунок зараз уміє показати. Прибраний чи ще не підтримуваний варіант при читанні
- * замінюється значенням за замовчуванням. Наступні роботи (теми дошки, набори фігур) розширюють лише ці переліки.
+ * замінюється значенням за замовчуванням. Наступні роботи (набори фігур) розширюють лише ці переліки.
+ * Список тем дошки має збігатися з `BoardThemes.all` (це перевіряє тест).
  */
 object AppearanceOptions {
     val defaults = Appearance()
 
-    val boardThemes: Set<BoardThemeId> = setOf(BoardThemeId("slate"))
+    val boardThemes: Set<BoardThemeId> =
+        setOf("slate", "brown", "green", "high_contrast").mapTo(linkedSetOf()) { BoardThemeId(it) }
     val pieceSets: Set<PieceSetId> = setOf(PieceSetId("chess_trainer"))
 }
 

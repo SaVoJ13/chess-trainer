@@ -11,25 +11,38 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import org.chesstrainer.app.game.GameViewModel
 import org.chesstrainer.app.puzzle.PuzzleViewModel
 import org.chesstrainer.app.review.GamesViewModel
+import org.chesstrainer.app.settings.SharedPrefsAppearancePreferences
 import org.chesstrainer.app.ui.AppNavigation
+import org.chesstrainer.app.ui.theme.BoardThemes
 import org.chesstrainer.app.ui.theme.ChessTheme
+import org.chesstrainer.app.ui.theme.LocalBoardPalette
 
 class MainActivity : ComponentActivity() {
     private val viewModel: GameViewModel by viewModels()
     private val gamesViewModel: GamesViewModel by viewModels()
     private val puzzleViewModel: PuzzleViewModel by viewModels()
+    private val appearancePreferences by lazy { SharedPrefsAppearancePreferences(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             ChessTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    AppNavigation(viewModel, gamesViewModel, puzzles = { puzzleViewModel.controller })
+                val appearance by appearancePreferences.observe().collectAsState(appearancePreferences.current())
+                CompositionLocalProvider(LocalBoardPalette provides BoardThemes.palette(appearance.boardTheme)) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        AppNavigation(
+                            viewModel, gamesViewModel, puzzles = { puzzleViewModel.controller },
+                            appearance = appearance, onAppearanceChange = appearancePreferences::update,
+                        )
+                    }
                 }
             }
         }
