@@ -25,6 +25,9 @@ import org.chesstrainer.app.puzzle.PuzzleController
 import org.chesstrainer.app.ui.analysis.AnalysisScreen
 import org.chesstrainer.app.ui.game.GameScreen
 import org.chesstrainer.app.ui.puzzle.PuzzleScreen
+import org.chesstrainer.app.ui.settings.AboutScreen
+import org.chesstrainer.app.ui.settings.LicensesScreen
+import org.chesstrainer.app.ui.settings.SettingsScreen
 import org.chesstrainer.app.ui.games.GamesScreen
 import org.chesstrainer.app.ui.games.ReviewScreen
 import org.chesstrainer.app.ui.games.rememberPgnTransfer
@@ -39,10 +42,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
-private enum class Screen { GAME, GAMES, REVIEW, PUZZLES, ANALYSIS }
+private enum class Screen { GAME, GAMES, REVIEW, PUZZLES, ANALYSIS, SETTINGS, ABOUT, LICENSES }
 
 /**
- * Мінімальна навігація без окремої бібліотеки: пʼять екранів (гра, партії, перегляд, задачі, аналіз), назад повертає на попередній. Стан екрана гри
+ * Мінімальна навігація без окремої бібліотеки: вісім екранів (гра, партії, перегляд, задачі, аналіз, налаштування, про застосунок, відкриті ліцензії), назад повертає на попередній. Стан екрана гри
  * тримає [GameController], тому перехід на список і назад його не губить.
  */
 @Composable
@@ -50,6 +53,8 @@ fun AppNavigation(viewModel: GameViewModel, games: GamesViewModel, puzzles: () -
     val controller = viewModel.controller
     var screen by rememberSaveable { mutableStateOf(Screen.GAME) }
     var analysisReturn by rememberSaveable { mutableStateOf(Screen.GAME) }
+    // Звідки відкрито «Відкриті ліцензії»: з налаштувань або з «Про застосунок»; назад повертає туди ж.
+    var licensesReturn by rememberSaveable { mutableStateOf(Screen.SETTINGS) }
     // Після відновлення процесу ViewModel порожній і рушій аналізу не віддано: екран аналізу без нього не показуємо.
     LaunchedEffect(Unit) { if (screen == Screen.ANALYSIS && !viewModel.analysisOpen) screen = Screen.GAME }
     fun openAnalysis(from: Screen, game: ChessGame?, ply: Int) {
@@ -70,6 +75,8 @@ fun AppNavigation(viewModel: GameViewModel, games: GamesViewModel, puzzles: () -
         when (screen) {
             Screen.REVIEW -> screen = Screen.GAMES
             Screen.ANALYSIS -> closeAnalysis()
+            Screen.ABOUT -> screen = Screen.SETTINGS
+            Screen.LICENSES -> screen = licensesReturn
             else -> screen = Screen.GAME
         }
     }
@@ -83,8 +90,19 @@ fun AppNavigation(viewModel: GameViewModel, games: GamesViewModel, puzzles: () -
                 val game = controller.state.value.game
                 openAnalysis(Screen.GAME, game, game.moves.size)
             },
+            onOpenSettings = { screen = Screen.SETTINGS },
         )
         Screen.ANALYSIS -> AnalysisScreen(viewModel.analysis, onBack = ::closeAnalysis)
+        Screen.SETTINGS -> SettingsScreen(
+            onBack = { screen = Screen.GAME },
+            onOpenAbout = { screen = Screen.ABOUT },
+            onOpenLicenses = { licensesReturn = Screen.SETTINGS; screen = Screen.LICENSES },
+        )
+        Screen.ABOUT -> AboutScreen(
+            onBack = { screen = Screen.SETTINGS },
+            onOpenLicenses = { licensesReturn = Screen.ABOUT; screen = Screen.LICENSES },
+        )
+        Screen.LICENSES -> LicensesScreen(onBack = { screen = licensesReturn })
         // Контролер задач створюється (і контент читається) лише при першому вході на екран.
         Screen.PUZZLES -> PuzzleScreen(puzzles(), onBack = { screen = Screen.GAME })
         Screen.GAMES -> {

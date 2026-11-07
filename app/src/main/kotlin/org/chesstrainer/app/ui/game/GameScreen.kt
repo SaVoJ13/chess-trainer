@@ -90,6 +90,7 @@ fun GameScreen(
     onOpenGames: () -> Unit = {},
     onOpenPuzzles: () -> Unit = {},
     onOpenAnalysis: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     val state by controller.state.collectAsState()
     var dialog by rememberSaveable { mutableStateOf(GameDialog.NONE) }
@@ -104,11 +105,11 @@ fun GameScreen(
                     StatusHeader(state, onOpenAnalysis)
                     Notices(state, controller)
                     MoveList(state, vertical = true, modifier = Modifier.weight(1f).fillMaxWidth())
-                    ActionButtons(state, controller, onOpenGames, onOpenPuzzles, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
+                    ActionButtons(state, controller, onOpenGames, onOpenPuzzles, onOpenSettings, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
                 }
             }
         } else {
-            val boardSide = minOf(maxWidth, (maxHeight - 260.dp).coerceAtLeast(220.dp))
+            val boardSide = minOf(maxWidth, (maxHeight - 312.dp).coerceAtLeast(220.dp))
             Column(
                 Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -119,7 +120,7 @@ fun GameScreen(
                 Notices(state, controller)
                 MoveList(state, vertical = false, modifier = Modifier.fillMaxWidth().height(44.dp))
                 Spacer(Modifier.weight(1f))
-                ActionButtons(state, controller, onOpenGames, onOpenPuzzles, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
+                ActionButtons(state, controller, onOpenGames, onOpenPuzzles, onOpenSettings, { dialog = GameDialog.RESIGN }, { dialog = GameDialog.NEW_GAME })
             }
         }
     }
@@ -341,6 +342,7 @@ private fun ActionButtons(
     controller: GameController,
     onOpenGames: () -> Unit,
     onOpenPuzzles: () -> Unit,
+    onOpenSettings: () -> Unit,
     onResign: () -> Unit,
     onNewGame: () -> Unit,
 ) {
@@ -354,6 +356,9 @@ private fun ActionButtons(
             ActionButton(R.string.puzzle_action_open, enabled = true, onClick = onOpenPuzzles)
             ActionButton(R.string.game_action_resign, enabled = !state.isOver, onClick = onResign)
             ActionButton(R.string.game_action_new_game, enabled = true, primary = true, onClick = onNewGame)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ActionButton(R.string.settings_action_open, enabled = true, onClick = onOpenSettings)
         }
     }
 }
